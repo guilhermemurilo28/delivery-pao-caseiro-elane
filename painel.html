@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Painel â PÃ£o Caseiro da Elane</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{--roxo:#2C1200;--roxo2:#5C2D00;--roxo3:#1A0A00;--amarelo:#D4961A;--amarelo2:#B87E00;
+    --cinza:#FBF5E6;--verde:#25d366;--sombra:0 4px 16px rgba(0,0,0,.12)}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,Arial,sans-serif}
+  body{background:var(--cinza);color:var(--roxo3)}
+  header{background:linear-gradient(135deg,var(--roxo),var(--roxo2));color:#fff;padding:16px 20px;
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  header h1{font-size:1.2rem;color:var(--amarelo)}
+  header h1 small{display:block;color:#F5E6C8;font-size:.7rem;font-weight:400;opacity:.85}
+  .btn{background:var(--amarelo);color:var(--roxo);border:none;border-radius:8px;padding:9px 14px;
+    font-weight:700;cursor:pointer;font-size:.85rem}
+  .btn-sec{background:#fff;color:var(--roxo);border:1px solid #ddd}
+  .btn-roxo{background:var(--roxo);color:#fff}
+  .wrap{max-width:1100px;margin:0 auto;padding:18px}
+  #login{max-width:380px;margin:8vh auto;background:#fff;border-radius:16px;padding:28px;box-shadow:var(--sombra);text-align:center}
+  #login h2{color:var(--roxo);margin-bottom:6px}
+  #login p{color:#777;font-size:.85rem;margin-bottom:18px}
+  input,select{width:100%;padding:11px;border:1px solid #ccc;border-radius:10px;font-size:.95rem;margin-bottom:12px}
+  .erro{color:#c0392b;font-size:.85rem;margin-bottom:10px;min-height:18px}
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+  .chip{background:#fff;border:1px solid #ddd;border-radius:20px;padding:7px 14px;cursor:pointer;font-size:.82rem;font-weight:600;color:var(--roxo)}
+  .chip.ativo{background:var(--roxo);color:#fff;border-color:var(--roxo)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+  .kpi{background:#fff;border-radius:14px;padding:16px;box-shadow:var(--sombra)}
+  .kpi .lbl{font-size:.78rem;color:#888;font-weight:600}
+  .kpi .val{font-size:1.7rem;font-weight:800;color:var(--roxo);margin-top:4px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .box{background:#fff;border-radius:14px;padding:16px;box-shadow:var(--sombra)}
+  .box h3{font-size:.95rem;color:var(--roxo);margin-bottom:12px}
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #eee;vertical-align:top}
+  th{color:#888;font-weight:700;font-size:.72rem;text-transform:uppercase}
+  .rank-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:.85rem}
+  .badge{font-size:.68rem;padding:2px 7px;border-radius:10px;font-weight:700}
+  .b-card{background:#e7f5ff;color:#1565c0}.b-manual{background:#fff3cd;color:#9a7d00}
+  .del{background:#ffe3e3;color:#c0392b;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-weight:700;font-size:.75rem}
+  .row-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
+  .muted{color:#999;text-align:center;padding:20px;font-size:.85rem}
+  label{font-size:.78rem;font-weight:600;color:var(--roxo);display:block;margin-bottom:3px}
+  .pmodal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 12px}
+  .pmodal.aberto{display:flex}
+  .pmodal-card{background:#fff;border-radius:14px;padding:22px;max-width:680px;width:100%;position:relative;box-shadow:var(--sombra)}
+  .pmodal-x{position:absolute;top:8px;right:14px;background:none;border:none;font-size:1.7rem;color:#999;cursor:pointer;line-height:1}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <h2>ð Painel da Elane</h2>
+  <p>Acesso restrito ao proprietÃ¡rio</p>
+  <input type="password" id="senha" placeholder="Senha do painel" onkeydown="if(event.key==='Enter')entrar()">
+  <div class="erro" id="loginErro"></div>
+  <button class="btn btn-roxo" style="width:100%" onclick="entrar()">Entrar</button>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <header>
+    <h1>ð Painel de Vendas <small>PÃ£o Caseiro da Elane</small></h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="abrirModal('modalPedido')">â Novo pedido</button>
+      <button class="btn" onclick="abrirModal('modalEsg')">ð« Esgotados</button>
+      <button class="btn btn-sec" onclick="carregar()">ð Atualizar</button>
+      <button class="btn btn-sec" onclick="exportarCSV()">â¬ï¸ CSV vendas</button>
+      <button class="btn btn-sec" onclick="exportarClientes()">ð Clientes</button>
+      <button class="btn btn-sec" onclick="trocarSenha()">ð Senha</button>
+      <button class="btn btn-sec" onclick="sair()">Sair</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="box" id="boxLoja" style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <div style="font-size:1rem">ðª Status da loja: <strong id="lojaTxt">â</strong></div>
+      <button class="btn" id="btnLoja" onclick="toggleLoja()">Alternar</button>
+    </div>
+    <div class="filtros" id="filtros">
+      <span class="chip ativo" data-p="hoje" onclick="setPeriodo(this)">Hoje</span>
+      <span class="chip" data-p="7" onclick="setPeriodo(this)">7 dias</span>
+      <span class="chip" data-p="30" onclick="setPeriodo(this)">30 dias</span>
+      <span class="chip" data-p="mes" onclick="setPeriodo(this)">MÃªs atual</span>
+      <span class="chip" data-p="tudo" onclick="setPeriodo(this)">Tudo</span>
+      <input type="date" id="dtIni" style="width:auto;margin:0" onchange="setPersonalizado()">
+      <span style="font-size:.8rem">atÃ©</span>
+      <input type="date" id="dtFim" style="width:auto;margin:0" onchange="setPersonalizado()">
+    </div>
+    <div class="cards">
+      <div class="kpi"><div class="lbl">Vendas no perÃ­odo</div><div class="val" id="kTotal">R$ 0,00</div></div>
+      <div class="kpi"><div class="lbl">NÂº de pedidos</div><div class="val" id="kQtd">0</div></div>
+      <div class="kpi"><div class="lbl">Ticket mÃ©dio</div><div class="val" id="kTicket">R$ 0,00</div></div>
+      <div class="kpi"><div class="lbl">Pedidos hoje</div><div class="val" id="kHoje">0</div></div>
+    </div>
+    <div class="grid2">
+      <div class="box"><h3>Vendas por dia</h3><canvas id="chDia" height="160"></canvas></div>
+      <div class="box"><h3>Formas de pagamento</h3><canvas id="chPg" height="160"></canvas></div>
+    </div>
+    <div class="grid2">
+      <div class="box"><h3>HorÃ¡rios de pico</h3><canvas id="chHora" height="160"></canvas></div>
+      <div class="box"><h3>Itens mais vendidos</h3><div id="rankItens"></div></div>
+    </div>
+
+    <!-- Modal: Novo pedido manual -->
+    <div class="pmodal" id="modalPedido"><div class="pmodal-card">
+      <button class="pmodal-x" onclick="fecharModal('modalPedido')">&times;</button>
+      <h3 style="color:var(--roxo);margin-bottom:6px">â LanÃ§ar pedido manual</h3>
+      <p style="font-size:.8rem;color:#777;margin-bottom:12px">Para pedidos que chegaram por WhatsApp, telefone ou pessoalmente.</p>
+      <div class="row-form">
+        <div><label>Data e hora</label><input type="datetime-local" id="mData"></div>
+        <div><label>Cliente (opcional)</label><input type="text" id="mCliente" placeholder="Nome"></div>
+        <div><label>Telefone (opcional)</label><input type="tel" id="mFone" placeholder="(88) 9..."></div>
+        <div><label>Item / descriÃ§Ã£o</label><input type="text" id="mDesc" placeholder="Ex.: Yakisoba Misto 750ml"></div>
+        <div><label>Qtd</label><input type="number" min="1" id="mQtd" value="1"></div>
+        <div><label>Valor total (R$)</label><input type="number" step="0.01" id="mValor" placeholder="0,00"></div>
+        <div><label>Pagamento</label><select id="mPg"><option>Pix</option><option>CartÃ£o</option><option>Dinheiro</option><option>Outro</option></select></div>
+        <div><button class="btn btn-roxo" onclick="addVenda()">Registrar pedido</button></div>
+      </div>
+      <div class="erro" id="mErro"></div>
+    </div></div>
+
+    <!-- Modal: Itens esgotados -->
+    <div class="pmodal" id="modalEsg"><div class="pmodal-card">
+      <button class="pmodal-x" onclick="fecharModal('modalEsg')">&times;</button>
+      <h3 style="color:var(--roxo);margin-bottom:6px">ð« Itens esgotados</h3>
+      <p style="font-size:.8rem;color:#777;margin-bottom:12px">Marque o que acabou â no cardÃ¡pio aparece riscado. Desmarque quando voltar.</p>
+      <div id="esgList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px;max-height:50vh;overflow:auto;border:1px solid #eee;border-radius:8px;padding:10px"></div>
+      <button class="btn btn-roxo" style="margin-top:12px" onclick="salvarEsgotados()">Salvar esgotados</button>
+      <span id="esgMsg" style="margin-left:10px;font-size:.85rem"></span>
+    </div></div>
+
+    <div class="box">
+      <h3>Pedidos no perÃ­odo (<span id="tblCount">0</span>)</h3>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Data</th><th>Cliente</th><th>Telefone</th><th>RegiÃ£o</th><th>Itens</th><th>Total</th><th>Pgto</th><th>Origem</th><th></th></tr></thead>
+          <tbody id="tblBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://fjlmdqxnxcitzfkumbow.supabase.co";
+const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqbG1kcXhueGNpdHpma3VtYm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDY5NjYsImV4cCI6MjA5ODA4Mjk2Nn0.9B4kn9KUvDZzF9XVhFrd4JLMyBv2K2UIAXUrsWqfDFI";
+const FN = `${SUPABASE_URL}/functions/v1/painel`;
+
+// Lista de todos os itens do cardÃ¡pio para marcar esgotados
+const ITENS_MENU = [
+  "ProteÃ­na","Frango Molho LimÃ£o","Frango Xadrez","Strogonoff de Frango","Frango Curry","FilÃ© de Peixe no Alecrim",
+  "Lasanha 500ml","Lasanha 750ml",
+  "EmpadÃ£o de Frango","EmpadÃ£o de CamarÃ£o",
+  "FilÃ© Ã  Parmegiana","FilÃ© de Peixe ao Molho de Coco",
+  "Creme de CamarÃ£o","Creme de Galinha",
+  "Yakisoba de Frango","Yakisoba de CamarÃ£o","Yakisoba de Carne","Yakisoba Misto",
+  "Espaguete Ã  Bolonhesa","Espaguete de CamarÃ£o","Espaguete de Frango ao Molho Branco",
+  "Espaguete de Cheddar com Bacon","Espaguete de BrÃ³colis ao Molho Branco","Espaguete Carbonara",
+  "Rigatoni de CamarÃ£o","Rigatoni de FilÃ©",
+  "Pastel Carne, Azeitona, Milho e Catupiry","Pastel Frango com Catupiry e Queijo",
+  "Pastel CamarÃ£o com Catupiry e Queijo","Pastel Bacon com Cheddar e Frango",
+  "HambÃºrguer","X-Bacon","X-Calabresa","X-Frango","X-PÃ£o Caseiro da Elane"
+];
+
+let esgotadosSel = [];
+
+async function carregarEsgotados(){
+  try{
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/config?select=esgotados&id=eq.1`,{headers:{"apikey":ANON,"Authorization":`Bearer ${ANON}`}});
+    const d=await r.json(); esgotadosSel=(d&&d[0]&&Array.isArray(d[0].esgotados))?d[0].esgotados:[];
+  }catch(e){ esgotadosSel=[]; }
+  renderEsg();
+}
+
+function renderEsg(){
+  const set=esgotadosSel.map(x=>String(x).toLowerCase());
+  document.getElementById('esgList').innerHTML=ITENS_MENU.map(n=>{
+    const ck=set.includes(n.toLowerCase())?'checked':'';
+    return `<label style="display:flex;gap:6px;align-items:center;font-size:.85rem;padding:3px"><input type="checkbox" value="${n}" ${ck}>${n}</label>`;
+  }).join('');
+}
+
+async function salvarEsgotados(){
+  const lista=[...document.querySelectorAll('#esgList input:checked')].map(i=>i.value);
+  const m=document.getElementById('esgMsg'); m.style.color='#777'; m.textContent='Salvando...';
+  const r=await chamar({acao:"set_esgotados", lista});
+  if(r.status===200){ esgotadosSel=lista; m.style.color='#1a7d3c'; m.textContent='Salvo!'; setTimeout(()=>m.textContent='',3000); }
+  else { m.style.color='#c0392b'; m.textContent='Erro ao salvar.'; }
+}
+
+let senha = localStorage.getItem('painel_senha_elane') || "";
+let pedidos = [];
+let periodo = "hoje";
+let charts = {};
+
+function brl(v){return 'R$ '+(Number(v)||0).toFixed(2).replace('.',',')}
+
+async function chamar(payload){
+  const r = await fetch(FN,{
+    method:"POST",
+    headers:{"apikey":ANON,"Authorization":`Bearer ${ANON}`,"Content-Type":"application/json"},
+    body:JSON.stringify({senha, ...payload})
+  });
+  return r;
+}
+
+async function entrar(){
+  const inp = document.getElementById('senha').value;
+  if(inp) senha = inp;
+  const er = document.getElementById('loginErro');
+  er.textContent = "Verificando...";
+  const r = await chamar({acao:"listar"});
+  if(r.status===200){
+    localStorage.setItem('painel_senha_elane', senha);
+    document.getElementById('login').style.display='none';
+    document.getElementById('app').style.display='block';
+    const d = await r.json(); pedidos = d.pedidos||[];
+    setDefaultManualDate(); render(); carregarStatus(); carregarEsgotados();
+  } else if(r.status===401){ er.textContent="Senha incorreta."; }
+  else { er.textContent="Erro ao conectar. Verifique as credenciais Supabase."; }
+}
+
+function sair(){ localStorage.removeItem('painel_senha_elane'); location.reload(); }
+
+async function carregar(){
+  const r = await chamar({acao:"listar"});
+  if(r.status===200){ const d=await r.json(); pedidos=d.pedidos||[]; render(); }
+  else if(r.status===401){ sair(); }
+}
+
+function setPeriodo(el){
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('ativo'));
+  el.classList.add('ativo'); periodo = el.dataset.p;
+  document.getElementById('dtIni').value=''; document.getElementById('dtFim').value='';
+  render();
+}
+function setPersonalizado(){
+  const i=document.getElementById('dtIni').value, f=document.getElementById('dtFim').value;
+  if(i&&f){ document.querySelectorAll('.chip').forEach(c=>c.classList.remove('ativo')); periodo="custom"; render(); }
+}
+
+function inicioDia(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
+function filtrar(){
+  const agora=new Date();
+  let ini, fim=new Date(agora.getFullYear(),agora.getMonth(),agora.getDate(),23,59,59,999);
+  if(periodo==="hoje") ini=inicioDia(agora);
+  else if(periodo==="7"){ ini=inicioDia(agora); ini.setDate(ini.getDate()-6); }
+  else if(periodo==="30"){ ini=inicioDia(agora); ini.setDate(ini.getDate()-29); }
+  else if(periodo==="mes") ini=new Date(agora.getFullYear(),agora.getMonth(),1);
+  else if(periodo==="tudo"){ ini=new Date(2000,0,1); }
+  else if(periodo==="custom"){
+    ini=inicioDia(document.getElementById('dtIni').value+"T00:00:00");
+    fim=new Date(document.getElementById('dtFim').value+"T23:59:59");
+  }
+  return pedidos.filter(p=>{ const t=new Date(p.created_at); return t>=ini && t<=fim; });
+}
+
+function render(){
+  const f = filtrar();
+  const soma = f.reduce((s,p)=>s+Number(p.total||0),0);
+  document.getElementById('kTotal').textContent = brl(soma);
+  document.getElementById('kQtd').textContent = f.length;
+  document.getElementById('kTicket').textContent = brl(f.length?soma/f.length:0);
+  const hojeIni=inicioDia(new Date());
+  document.getElementById('kHoje').textContent = pedidos.filter(p=>new Date(p.created_at)>=hojeIni).length;
+
+  const porDia={};
+  f.forEach(p=>{ const k=new Date(p.created_at).toLocaleDateString('pt-BR'); porDia[k]=(porDia[k]||0)+Number(p.total||0); });
+  desenhar('chDia','bar',Object.keys(porDia),Object.values(porDia),'Vendas (R$)','#D4961A');
+
+  const porPg={};
+  f.forEach(p=>{ const k=p.pagamento||'NÃ£o informado'; porPg[k]=(porPg[k]||0)+Number(p.total||0); });
+  desenharPie('chPg',Object.keys(porPg),Object.values(porPg));
+
+  const porHora=new Array(24).fill(0);
+  f.forEach(p=>{ porHora[new Date(p.created_at).getHours()]++; });
+  desenhar('chHora','bar',porHora.map((_,h)=>h+'h'),porHora,'Pedidos','#5C2D00');
+
+  const itc={};
+  f.forEach(p=>{ (p.itens||[]).forEach(i=>{ if(i&&i.nome){ itc[i.nome]=(itc[i.nome]||0)+(Number(i.qtd)||1); } }); });
+  const rank=Object.entries(itc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  document.getElementById('rankItens').innerHTML = rank.length
+    ? rank.map(([n,q])=>`<div class="rank-item"><span>${n}</span><strong>${q}x</strong></div>`).join('')
+    : '<div class="muted">Sem itens detalhados no perÃ­odo.</div>';
+
+  document.getElementById('tblCount').textContent=f.length;
+  document.getElementById('tblBody').innerHTML = f.length ? f.map(p=>{
+    const dt=new Date(p.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const itens=(p.itens||[]).map(i=>`${i.qtd}x ${i.nome}`).join(', ')||(p.obs||'â');
+    const bcls=p.origem==='manual'?'b-manual':'b-card';
+    return `<tr>
+      <td>${dt}</td><td>${p.cliente||'â'}</td><td>${p.telefone||'â'}</td><td>${p.bairro||'â'}</td>
+      <td style="max-width:220px">${itens}</td>
+      <td><strong>${brl(p.total)}</strong></td><td>${p.pagamento||'â'}</td>
+      <td><span class="badge ${bcls}">${p.origem==='manual'?'manual':'site'}</span></td>
+      <td><button class="del" onclick="excluir('${p.id}')">excluir</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="9" class="muted">Nenhum pedido no perÃ­odo.</td></tr>';
+}
+
+function desenhar(id,tipo,labels,data,label,cor){
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id),{
+    type:tipo,
+    data:{labels,datasets:[{label,data,backgroundColor:cor,borderRadius:6}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}},maintainAspectRatio:false}
+  });
+}
+function desenharPie(id,labels,data){
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id),{
+    type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:['#2C1200','#D4961A','#25d366','#1565c0','#c0392b','#9b59b6']}]},
+    options:{plugins:{legend:{position:'bottom'}},maintainAspectRatio:false}
+  });
+}
+
+function setDefaultManualDate(){
+  const n=new Date(); n.setMinutes(n.getMinutes()-n.getTimezoneOffset());
+  document.getElementById('mData').value=n.toISOString().slice(0,16);
+}
+
+function abrirModal(id){ document.getElementById(id).classList.add('aberto'); if(id==='modalEsg') renderEsg(); }
+function fecharModal(id){ document.getElementById(id).classList.remove('aberto'); }
+
+async function addVenda(){
+  const er=document.getElementById('mErro'); er.textContent='';
+  const valor=parseFloat(document.getElementById('mValor').value);
+  if(!valor||valor<=0){ er.textContent='Informe um valor vÃ¡lido.'; return; }
+  const data=document.getElementById('mData').value;
+  const pg=document.getElementById('mPg').value;
+  const desc=document.getElementById('mDesc').value.trim();
+  const cliente=document.getElementById('mCliente').value.trim()||'Venda manual';
+  const fone=document.getElementById('mFone').value.trim();
+  const qtd=parseInt(document.getElementById('mQtd').value)||1;
+  const payload={acao:"add_venda", total:valor, pagamento:pg, cliente, telefone:fone||null, obs:desc||null,
+    created_at: data?new Date(data).toISOString():new Date().toISOString(),
+    itens: desc?[{nome:desc,qtd:qtd,preco:+(valor/qtd).toFixed(2)}]:null };
+  const r=await chamar(payload);
+  if(r.status===200){
+    ['mValor','mDesc','mCliente','mFone'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('mQtd').value='1';
+    er.style.color='#1a7d3c'; er.textContent='Pedido registrado!';
+    setTimeout(()=>{er.textContent='';er.style.color='';fecharModal('modalPedido');},1200);
+    carregar();
+  } else { er.textContent='Erro ao registrar.'; }
+}
+
+function exportarClientes(){
+  const map=new Map();
+  pedidos.forEach(p=>{ const tel=(p.telefone||'').trim(); if(tel && !map.has(tel)) map.set(tel, p.cliente||''); });
+  if(map.size===0){ alert('Ainda nÃ£o hÃ¡ telefones de clientes registrados.'); return; }
+  const linhas=[['Nome','Telefone']];
+  map.forEach((nome,tel)=>linhas.push([nome,tel]));
+  const csv=linhas.map(l=>l.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(["ï»¿"+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='clientes-pao-caseiro-elane.csv'; a.click();
+}
+
+async function excluir(id){
+  if(!confirm('Excluir este pedido?'))return;
+  const r=await chamar({acao:"excluir", id});
+  if(r.status===200) carregar();
+}
+
+function exportarCSV(){
+  const f=filtrar();
+  const linhas=[['Data','Cliente','Telefone','Tipo','RegiÃ£o','Itens','Total','Taxa','Pagamento','Origem','LocalizaÃ§Ã£o','ReferÃªncia','EndereÃ§o','Obs']];
+  f.forEach(p=>{
+    const itens=(p.itens||[]).map(i=>`${i.qtd}x ${i.nome}`).join('; ');
+    linhas.push([new Date(p.created_at).toLocaleString('pt-BR'),p.cliente||'',p.telefone||'',p.tipo||'',p.bairro||'',itens,
+      Number(p.total||0).toFixed(2),Number(p.taxa_entrega||0).toFixed(2),p.pagamento||'',p.origem||'',p.localizacao||'',p.referencia||'',p.endereco||'',p.obs||'']);
+  });
+  const csv=linhas.map(l=>l.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(["ï»¿"+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='vendas-pao-caseiro-elane.csv'; a.click();
+}
+
+async function trocarSenha(){
+  const nova=prompt("Digite a NOVA senha do painel (mÃ­nimo 6 caracteres):");
+  if(nova===null) return;
+  if(nova.trim().length<6){ alert("Senha muito curta."); return; }
+  const conf=prompt("Confirme a nova senha:");
+  if(conf===null) return;
+  if(conf.trim()!==nova.trim()){ alert("As senhas nÃ£o conferem."); return; }
+  const r=await chamar({acao:"trocar_senha", nova:nova.trim()});
+  if(r.status===200){
+    senha=nova.trim(); localStorage.setItem('painel_senha_elane',senha);
+    alert("Senha alterada com sucesso!");
+  } else { alert("Erro ao trocar a senha."); }
+}
+
+let lojaAberta=true;
+async function carregarStatus(){
+  try{
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/config?select=loja_aberta&id=eq.1`,{headers:{"apikey":ANON,"Authorization":`Bearer ${ANON}`}});
+    const d=await r.json(); lojaAberta=(d&&d[0])?d[0].loja_aberta:true;
+  }catch(e){}
+  pintarStatus();
+}
+function pintarStatus(){
+  const t=document.getElementById('lojaTxt'), b=document.getElementById('btnLoja');
+  if(lojaAberta){ t.textContent='ABERTA â'; t.style.color='#1a7d3c';
+    b.textContent='ð´ Fechar loja'; b.style.background='#c0392b'; b.style.color='#fff'; }
+  else { t.textContent='FECHADA â'; t.style.color='#c0392b';
+    b.textContent='ð¢ Abrir loja'; b.style.background='#25d366'; b.style.color='#fff'; }
+}
+async function toggleLoja(){
+  const nova=!lojaAberta;
+  const r=await chamar({acao:"set_loja", aberta:nova});
+  if(r.status===200){ lojaAberta=nova; pintarStatus(); }
+  else alert('Erro ao alterar o status da loja.');
+}
+
+if(senha){ entrar(); }
+</script>
+</body>
+</html>
