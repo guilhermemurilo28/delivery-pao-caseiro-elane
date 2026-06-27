@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pão Caseiro da Elane — Delivery</title>
+<style>
+  :root{
+    --roxo:#2C1200; --roxo2:#5C2D00; --roxo3:#1A0A00;
+    --amarelo:#D4961A; --amarelo2:#B87E00;
+    --branco:#fff; --cinza:#FBF5E6; --texto:#1A0A00;
+    --verde:#25d366; --sombra:0 6px 22px rgba(0,0,0,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--cinza);color:var(--texto);padding-bottom:90px}
+  header{
+    background:linear-gradient(135deg,var(--roxo),var(--roxo2));
+    color:var(--amarelo);text-align:center;padding:22px 16px;position:relative;
+    box-shadow:var(--sombra)
+  }
+  header h1{font-size:1.9rem;letter-spacing:1px;color:var(--amarelo)}
+  header p{color:#F5E6C8;font-size:.85rem;margin-top:4px;opacity:.9}
+  .status{display:inline-block;margin-top:8px;background:var(--verde);color:#fff;
+    font-size:.75rem;padding:3px 12px;border-radius:20px;font-weight:600}
+  nav{position:sticky;top:0;z-index:50;background:var(--roxo3);display:flex;gap:6px;
+    overflow-x:auto;padding:10px;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{white-space:nowrap;background:transparent;color:#F5E6C8;border:1px solid #8B5E3C;
+    padding:7px 14px;border-radius:20px;font-size:.85rem;cursor:pointer;font-weight:600;transition:.2s}
+  nav button.ativo{background:var(--amarelo);color:var(--roxo);border-color:var(--amarelo)}
+  main{max-width:760px;margin:0 auto;padding:16px}
+  .secao-titulo{color:var(--roxo);font-size:1.3rem;margin:22px 0 10px;
+    border-left:5px solid var(--amarelo);padding-left:10px}
+  .secao-sub{font-size:.85rem;color:#8B5E3C;margin:-6px 0 12px;padding-left:15px}
+  .card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;
+    box-shadow:var(--sombra);display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  .card h3{font-size:1rem;color:var(--roxo)}
+  .card .desc{font-size:.8rem;color:#6b6b6b;margin-top:4px;line-height:1.35}
+  .precos{font-size:.82rem;color:var(--roxo);font-weight:700;margin-top:6px}
+  .btn-add{background:var(--amarelo);color:var(--roxo);border:none;border-radius:10px;
+    padding:9px 14px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:center;transition:.15s}
+  .btn-add:hover{background:var(--amarelo2)}
+  .preco-tag{font-weight:800;color:var(--roxo);font-size:1.05rem}
+  .barra-carrinho{position:fixed;bottom:0;left:0;right:0;background:var(--roxo);
+    color:#fff;display:flex;justify-content:space-between;align-items:center;
+    padding:14px 18px;box-shadow:0 -4px 20px rgba(0,0,0,.25);z-index:60;cursor:pointer}
+  .barra-carrinho .qtd{background:var(--amarelo);color:var(--roxo);border-radius:50%;
+    width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:.85rem;margin-right:8px}
+  .barra-carrinho .ver{background:var(--amarelo);color:var(--roxo);padding:8px 16px;
+    border-radius:10px;font-weight:700}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;
+    display:none;align-items:flex-end;justify-content:center}
+  .modal-bg.aberto{display:flex}
+  .modal{background:#fff;width:100%;max-width:760px;max-height:92vh;overflow-y:auto;
+    border-radius:18px 18px 0 0;padding:20px}
+  .modal h2{color:var(--roxo);margin-bottom:14px}
+  .fechar{float:right;background:none;border:none;font-size:1.6rem;color:#999;cursor:pointer;line-height:1}
+  .opc{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #eee;font-size:.9rem}
+  .opc input{width:18px;height:18px;accent-color:var(--roxo)}
+  .grupo-titulo{font-weight:700;color:var(--roxo);margin:16px 0 6px;font-size:.95rem}
+  .grupo-titulo small{font-weight:400;color:#999}
+  .tamanho-op{display:flex;justify-content:space-between;align-items:center;border:2px solid #eee;
+    border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+  .tamanho-op.sel{border-color:var(--amarelo);background:#fffbe6}
+  .item-carrinho{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid #eee;font-size:.9rem}
+  .item-carrinho .info{flex:1}
+  .item-carrinho .det{font-size:.75rem;color:#888;margin-top:2px}
+  .rm{background:#ffe3e3;color:#c0392b;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-weight:700}
+  .total-linha{display:flex;justify-content:space-between;font-size:1.1rem;font-weight:800;
+    color:var(--roxo);margin:14px 0;padding-top:12px;border-top:2px solid var(--roxo)}
+  input[type=text],input[type=tel],textarea,select{width:100%;padding:10px;border:1px solid #ccc;
+    border-radius:10px;margin:5px 0 12px;font-size:.9rem;font-family:inherit}
+  label{font-weight:600;font-size:.85rem;color:var(--roxo)}
+  .pg-opcoes{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+  .pg-opcoes label{border:2px solid #eee;border-radius:10px;padding:8px 12px;cursor:pointer;flex:1;text-align:center;font-weight:600;color:var(--roxo)}
+  .pg-opcoes input{display:none}
+  .pg-opcoes label:has(input:checked){border-color:var(--amarelo);background:#fffbe6}
+  .btn-zap{background:var(--verde);color:#fff;border:none;width:100%;padding:15px;
+    border-radius:12px;font-size:1.05rem;font-weight:800;cursor:pointer;margin-top:8px}
+  .btn-zap:disabled{background:#bbb;cursor:not-allowed}
+  .vazio{text-align:center;color:#999;padding:30px}
+  .aviso{font-size:.72rem;color:#999;text-align:center;margin-top:10px}
+  .qty-ctrl{display:flex;align-items:center;gap:10px;margin:10px 0}
+  .qty-ctrl button{width:34px;height:34px;border-radius:8px;border:none;background:var(--roxo);
+    color:#fff;font-size:1.2rem;font-weight:700;cursor:pointer}
+  .qty-ctrl span{font-weight:800;font-size:1.1rem;min-width:24px;text-align:center}
+  .card-esgotado{opacity:.6}
+  .card-esgotado h3{text-decoration:line-through;text-decoration-color:#c0392b}
+  .badge-esg{background:#c0392b;color:#fff;font-size:.62rem;padding:2px 7px;border-radius:10px;
+    vertical-align:middle;margin-left:6px;text-decoration:none;display:inline-block}
+  .btn-esg{background:#ccc !important;color:#777 !important;cursor:not-allowed !important}
+  .opc-esg{opacity:.55}
+  .opc-esg span.nm{text-decoration:line-through}
+  .tag-esg{color:#c0392b;font-size:.7rem;font-weight:700;margin-left:auto}
+  .btn-local{background:var(--roxo);color:#fff;border:none;border-radius:10px;padding:11px 14px;
+    font-weight:700;cursor:pointer;width:100%;font-size:.95rem;margin:4px 0 8px}
+  .local-status{font-size:.82rem;color:#444;margin-bottom:6px;min-height:18px}
+  .local-status a{color:var(--roxo2);font-weight:700}
+  .box-pix{background:#fffbe6;border:2px solid var(--amarelo);border-radius:12px;padding:14px;margin:6px 0 12px;text-align:center}
+  .pix-tit{font-weight:800;color:var(--roxo);margin-bottom:8px;font-size:1rem}
+  .pix-chave{font-size:1rem;font-weight:800;letter-spacing:1px;color:var(--roxo3);
+    background:#fff;border:1px dashed var(--amarelo2);border-radius:8px;padding:8px;margin-bottom:8px;word-break:break-all}
+  .btn-copiar{background:var(--roxo);color:#fff;border:none;border-radius:8px;padding:9px 16px;
+    font-weight:700;cursor:pointer;font-size:.9rem}
+  .pix-info{font-size:.8rem;color:#555;margin-top:8px;line-height:1.4}
+  .resumo-tot{background:#faf7fd;border:1px solid #e7d9f2;border-radius:10px;padding:10px 12px;margin:6px 0 10px}
+  .resumo-tot .lin{display:flex;justify-content:space-between;font-size:.9rem;padding:2px 0;color:#555}
+  .resumo-tot .lin.tot{font-weight:800;color:var(--roxo);font-size:1.05rem;border-top:1px solid #e7d9f2;margin-top:4px;padding-top:6px}
+  /* Mercado Pago */
+  .box-mp{background:#fff9f0;border:2px solid var(--amarelo);border-radius:12px;padding:14px;margin:6px 0 12px}
+  .mp-tit{font-weight:800;color:var(--roxo);margin-bottom:8px;font-size:1rem}
+  #mp-container{min-height:60px}
+  .badge-coming{background:#8B5E3C;color:#fff;font-size:.62rem;padding:2px 7px;border-radius:10px;margin-left:6px}
+</style>
+<!-- Mercado Pago SDK -->
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+</head>
+<body>
+
+<header>
+  <h1>🍞 Pão Caseiro da Elane</h1>
+  <p>Sabor caseiro que abraça o coração!</p>
+  <span class="status" id="statusLoja">● Aberto agora</span>
+</header>
+
+<nav id="abas"></nav>
+<main id="conteudo"></main>
+
+<footer style="text-align:center;padding:20px 10px 6px">
+  <a href="/painel.html" style="color:#8B5E3C;font-size:.72rem;text-decoration:none;opacity:.6">🔒 Área do proprietário</a>
+</footer>
+
+<div class="barra-carrinho" onclick="abrirCarrinho()">
+  <span><span class="qtd" id="qtdCarrinho">0</span> ver pedido</span>
+  <span class="ver">R$ <span id="totalBarra">0,00</span></span>
+</div>
+
+<!-- Modal de item -->
+<div class="modal-bg" id="modalItem">
+  <div class="modal">
+    <button class="fechar" onclick="fecharModal('modalItem')">&times;</button>
+    <h2 id="itemNome"></h2>
+    <div id="itemConteudo"></div>
+    <div class="qty-ctrl">
+      <button onclick="mudarQtd(-1)">−</button>
+      <span id="qtdItem">1</span>
+      <button onclick="mudarQtd(1)">+</button>
+    </div>
+    <button class="btn-zap" style="background:var(--roxo)" onclick="adicionarAoCarrinho()">
+      Adicionar • R$ <span id="precoItemBtn">0,00</span>
+    </button>
+  </div>
+</div>
+
+<!-- Modal carrinho/checkout -->
+<div class="modal-bg" id="modalCarrinho">
+  <div class="modal">
+    <button class="fechar" onclick="fecharModal('modalCarrinho')">&times;</button>
+    <h2>Seu pedido</h2>
+    <div id="listaCarrinho"></div>
+    <div class="total-linha"><span>Total</span><span>R$ <span id="totalModal">0,00</span></span></div>
+    <div id="formCheckout" style="display:none">
+      <label>Seu nome</label>
+      <input type="text" id="cliNome" placeholder="Seu nome">
+      <label>WhatsApp (para receber promoções)</label>
+      <input type="tel" id="cliFone" placeholder="(88) 9 0000-0000">
+      <label>Entrega ou retirada?</label>
+      <select id="cliEntrega" onchange="toggleEndereco()">
+        <option value="Entrega">Entrega (delivery)</option>
+        <option value="Retirada">Retirar na loja</option>
+      </select>
+      <div id="boxEndereco">
+        <label>Bairro / região (taxa de entrega)</label>
+        <select id="cliBairro" onchange="atualizarTotais()">
+          <option value="0" data-nome="">Selecione a região</option>
+          <option value="4" data-nome="Canoa Quebrada">Canoa Quebrada — R$ 4,00</option>
+          <option value="4" data-nome="Aracati Centro">Aracati Centro — R$ 4,00</option>
+          <option value="6" data-nome="Estradas/outros bairros">Estradas/outros bairros — R$ 6,00</option>
+        </select>
+        <label>Localização da entrega</label>
+        <button type="button" class="btn-local" onclick="pegarLocalizacao()">📍 Enviar minha localização</button>
+        <div id="localStatus" class="local-status"></div>
+        <label>Ponto de referência</label>
+        <input type="text" id="cliRef" placeholder="Ex.: próximo ao letreiro de Canoa, barraca do João">
+        <div id="boxEndManual" style="display:none">
+          <label>Descreva onde você está</label>
+          <textarea id="cliEndereco" rows="2" placeholder="Rua, barraca, ponto de referência..."></textarea>
+        </div>
+      </div>
+      <label>Forma de pagamento</label>
+      <div class="pg-opcoes">
+        <label><input type="radio" name="pg" value="Pix" checked onchange="togglePagamento()"><span>Pix</span></label>
+        <label><input type="radio" name="pg" value="Cartão Online" onchange="togglePagamento()"><span>💳 Cartão Online</span></label>
+        <label><input type="radio" name="pg" value="Cartão na entrega" onchange="togglePagamento()"><span>Cartão na entrega</span></label>
+        <label><input type="radio" name="pg" value="Dinheiro" onchange="togglePagamento()"><span>Dinheiro</span></label>
+      </div>
+
+      <!-- PIX manual -->
+      <div id="boxPix" class="box-pix">
+        <div class="pix-tit">Pague com Pix 🟢</div>
+        <div class="pix-chave" id="pixKey">d5f22d0d-b130-4615-91b6-7e887bcf2956</div>
+        <button type="button" class="btn-copiar" onclick="copiarPix()">📋 Copiar chave Pix</button>
+        <p class="pix-info">Faça o Pix do valor total e <strong>envie o comprovante aqui no WhatsApp</strong> para confirmarmos seu pedido.</p>
+      </div>
+
+      <!-- Mercado Pago Checkout Bricks -->
+      <div id="boxMercadoPago" class="box-mp" style="display:none">
+        <div class="mp-tit">💳 Pagar com Cartão Online</div>
+        <p style="font-size:.8rem;color:#555;margin-bottom:10px">Pagamento seguro via Mercado Pago. Aprovação imediata.</p>
+        <div id="mp-container"></div>
+        <p style="font-size:.72rem;color:#999;margin-top:8px;text-align:center">Taxa do cartão: ~4,99% (cobrada pelo Mercado Pago)</p>
+      </div>
+
+      <label>Observações (opcional)</label>
+      <textarea id="cliObs" rows="2" placeholder="Ex.: sem cebola, troco para R$50..."></textarea>
+      <div id="resumoTotais" class="resumo-tot"></div>
+      <button class="btn-zap" id="btnEnviarZap" onclick="enviarWhatsApp()">📲 Enviar pedido pelo WhatsApp</button>
+      <p class="aviso">O pedido é confirmado pela loja no WhatsApp. No Pix, envie o comprovante para confirmar.</p>
+    </div>
+    <button class="btn-zap" id="btnIrCheckout" onclick="irParaCheckout()">Finalizar pedido</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  CONFIG DO CLIENTE — altere apenas aqui
+// ═══════════════════════════════════════════
+const SUPABASE_URL  = "https://fjlmdqxnxcitzfkumbow.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqbG1kcXhueGNpdHpma3VtYm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDY5NjYsImV4cCI6MjA5ODA4Mjk2Nn0.9B4kn9KUvDZzF9XVhFrd4JLMyBv2K2UIAXUrsWqfDFI";
+const WHATSAPP      = "5588996073668";
+const PIX           = "d5f22d0d-b130-4615-91b6-7e887bcf2956";
+// Mercado Pago: obtenha em https://www.mercadopago.com.br/developers/panel/app
+// Crie um app, copie a PUBLIC KEY (começa com APP_USR-)
+const MP_PUBLIC_KEY = "COLE_SUA_PUBLIC_KEY_MERCADO_PAGO_AQUI";
+
+// ═══════════════════════════════════════════
+//  CARDÁPIO
+// ═══════════════════════════════════════════
+const MENU = {
+  "🥗 Marmitas Fitness": {
+    sub: "Almoço saudável • R$ 27,00 • Entrega para toda Canoa",
+    itens: [
+      { nome:"Proteína",              preco:27.00, desc:"Grelhado no ponto + acompanhamentos fitness" },
+      { nome:"Frango Molho Limão",    preco:27.00, desc:"Frango suculento ao molho de limão" },
+      { nome:"Frango Xadrez",         preco:27.00, desc:"Clássico agridoce com legumes" },
+      { nome:"Strogonoff de Frango",  preco:27.00, desc:"Cremoso e temperado com amor" },
+      { nome:"Frango Curry",          preco:27.00, desc:"Especiado e aromático" },
+      { nome:"Filé de Peixe no Alecrim", preco:27.00, desc:"Peixe no alecrim com acompanhamentos" },
+    ]
+  },
+  "🍝 Lasanhas": {
+    sub: "Massas caseiras • Molhos: Camarão, Bolonhesa, Frango ou Molho Branco",
+    itens: [
+      { nome:"Lasanha 500ml", tamanhos: null, preco:25.00, desc:"Massa caseira com molho à sua escolha (informe nas obs)" },
+      { nome:"Lasanha 750ml", preco:35.00, desc:"Porção generosa — massa caseira com molho à sua escolha (informe nas obs)" },
+    ]
+  },
+  "🥧 Empadão na Marmita": {
+    sub: "Empadão 500ml — assado na hora",
+    itens: [
+      { nome:"Empadão de Frango",  preco:25.00, desc:"Empadão de frango 500ml, bem temperado e dourado" },
+      { nome:"Empadão de Camarão", preco:30.00, desc:"Empadão de camarão 500ml, cremoso e saboroso" },
+    ]
+  },
+  "🍽️ Pratos Especiais": {
+    sub: "Almoço — cada prato acompanha conforme descrito",
+    itens: [
+      { nome:"Filé à Parmegiana",          preco:40.00, desc:"Filé empanado, molho de tomate e mussarela gratinada. Acompanha: Espaguete ou Purê (informe nas obs)" },
+      { nome:"Filé de Peixe ao Molho de Coco", preco:40.00, desc:"Peixe suave ao cremoso molho de coco. Acompanha: Purê ou Arroz (informe nas obs)" },
+    ]
+  },
+  "🥣 Cremes": {
+    sub: "Sopas cremosas e reconfortantes",
+    itens: [
+      { nome:"Creme de Camarão", preco:28.00, desc:"Creme rico e encorpado de camarão" },
+      { nome:"Creme de Galinha", preco:20.00, desc:"Creme caseiro de galinha, leve e nutritivo" },
+    ]
+  },
+  "🍜 Yakisoba": {
+    sub: "750ml — muito sabor, ingredientes selecionados, feito na hora!",
+    itens: [
+      { nome:"Yakisoba de Frango",  preco:30.00, desc:"Macarrão oriental com frango e legumes refogados • 750ml" },
+      { nome:"Yakisoba de Camarão", preco:35.00, desc:"Macarrão oriental com camarão e legumes refogados • 750ml" },
+      { nome:"Yakisoba de Carne",   preco:35.00, desc:"Macarrão oriental com carne bovina e legumes • 750ml" },
+      { nome:"Yakisoba Misto",      preco:40.00, desc:"Frango + Camarão + Carne. A porção completa! • 750ml" },
+    ]
+  },
+  "🍝 Espaguetes & Massas": {
+    sub: "Massas feitas com ingredientes selecionados e muito amor",
+    itens: [
+      { nome:"Espaguete à Bolonhesa",            preco:25.00, desc:"Tradicional molho bolonhesa preparado com carne e temperos especiais" },
+      { nome:"Espaguete de Camarão",             preco:35.00, desc:"Espaguete servido com camarões selecionados e molho especial" },
+      { nome:"Espaguete de Frango ao Molho Branco", preco:35.00, desc:"Massa envolvida em um cremoso molho branco com frango desfiado" },
+      { nome:"Espaguete de Cheddar com Bacon",   preco:35.00, desc:"Espaguete coberto com molho cheddar cremoso e bacon crocante" },
+      { nome:"Espaguete de Brócolis ao Molho Branco", preco:38.00, desc:"Espaguete com brócolis frescos envoltos em molho branco cremoso" },
+      { nome:"Espaguete Carbonara",              preco:35.00, desc:"Clássico italiano com molho cremoso de ovos e bacon" },
+      { nome:"Rigatoni de Camarão",              preco:38.00, desc:"Rigatoni ao molho especial com camarões selecionados" },
+      { nome:"Rigatoni de Filé",                 preco:38.00, desc:"Rigatoni com filé mignon ao molho especial" },
+    ]
+  },
+  "🥟 Pastéis": {
+    sub: "Pastéis artesanais — crocantes por fora, recheados por dentro",
+    itens: [
+      { nome:"Pastel Carne, Azeitona, Milho e Catupiry", preco:15.00, desc:"Combinação clássica irresistível" },
+      { nome:"Pastel Frango com Catupiry e Queijo",      preco:15.00, desc:"Frango desfiado com catupiry e queijo derretido" },
+      { nome:"Pastel Camarão com Catupiry e Queijo",     preco:18.00, desc:"Camarão temperado com catupiry e queijo" },
+      { nome:"Pastel Bacon com Cheddar e Frango",        preco:18.00, desc:"Bacon crocante, cheddar cremoso e frango" },
+    ]
+  },
+  "🥪 Sanduíches": {
+    sub: "Todos acompanham batata frita 🍟",
+    itens: [
+      { nome:"Hambúrguer",              preco:18.00, desc:"Pão, carne artesanal, queijo, alface e tomate" },
+      { nome:"X-Bacon",                 preco:20.00, desc:"Pão, carne, bacon crocante, queijo, alface e tomate" },
+      { nome:"X-Calabresa",             preco:20.00, desc:"Pão, calabresa, carne, queijo, alface e tomate" },
+      { nome:"X-Frango",                preco:20.00, desc:"Pão, frango desfiado, carne, queijo, alface e tomate" },
+      { nome:"X-Pão Caseiro da Elane",  preco:25.00, desc:"O especial da casa! Pão, carne, queijo, frango, ovo, cheddar e bacon" },
+    ]
+  },
+  "🍞 Pães por Encomenda": {
+    sub: "Em breve — cardápio sendo preparado com carinho! 🤍",
+    itens: [
+      { nome:"Pão Caseiro (em breve)", preco:0, desc:"Encomende pelo WhatsApp! (88) 9 9607-3668" },
+    ]
+  },
+};
+
+// ═══════════════════════════════════════════
+//  SUPABASE — registro de pedidos
+// ═══════════════════════════════════════════
+function gravarPedido(dados){
+  if(SUPABASE_URL.includes("COLE_")) return; // placeholder, não tenta gravar
+  try{
+    fetch(`${SUPABASE_URL}/rest/v1/pedidos`,{
+      method:"POST",
+      headers:{"apikey":SUPABASE_ANON,"Authorization":`Bearer ${SUPABASE_ANON}`,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body:JSON.stringify(dados)
+    });
+  }catch(e){}
+}
+
+let LOJA_ABERTA = true;
+async function carregarConfig(){
+  if(SUPABASE_URL.includes("COLE_")){ montarMenu(); return; }
+  try{
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/config?select=loja_aberta,esgotados&id=eq.1`,{headers:{"apikey":SUPABASE_ANON,"Authorization":`Bearer ${SUPABASE_ANON}`}});
+    const d=await r.json();
+    if(d && d[0]){
+      LOJA_ABERTA = d[0].loja_aberta;
+      ESGOTADOS = Array.isArray(d[0].esgotados) ? d[0].esgotados : [];
+    }
+  }catch(e){ LOJA_ABERTA = true; ESGOTADOS = []; }
+  const b=document.getElementById('statusLoja');
+  if(b){
+    if(LOJA_ABERTA){ b.textContent='● Aberto agora'; b.style.background='var(--verde)'; }
+    else { b.textContent='● Fechado no momento'; b.style.background='#c0392b'; }
+  }
+  montarMenu();
+}
+
+let ESGOTADOS = [];
+function esgotado(nome){ return ESGOTADOS.map(x=>x.toLowerCase().trim()).includes((nome||"").toLowerCase().trim()); }
+
+// ═══════════════════════════════════════════
+//  ESTADO
+// ═══════════════════════════════════════════
+let carrinho = [];
+let itemAtual = null;
+let qtdAtual = 1;
+
+// ═══════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════
+function brl(v){return v.toFixed(2).replace('.',',')}
+
+function montarAbas(){
+  const nav=document.getElementById('abas');
+  Object.keys(MENU).forEach((cat,i)=>{
+    const b=document.createElement('button');
+    b.textContent=cat;
+    if(i===0)b.classList.add('ativo');
+    b.onclick=()=>{
+      document.querySelectorAll('#abas button').forEach(x=>x.classList.remove('ativo'));
+      b.classList.add('ativo');
+      document.getElementById('sec-'+i).scrollIntoView({behavior:'smooth',block:'start'});
+    };
+    nav.appendChild(b);
+  });
+}
+
+function montarMenu(){
+  const c=document.getElementById('conteudo');
+  c.innerHTML='';
+  Object.keys(MENU).forEach((cat,i)=>{
+    const sec=MENU[cat];
+    let html=`<h2 class="secao-titulo" id="sec-${i}">${cat}</h2>`;
+    if(sec.sub)html+=`<p class="secao-sub">${sec.sub}</p>`;
+    sec.itens.forEach((item,j)=>{
+      const itemEsg = esgotado(item.nome);
+      const gratis = item.preco===0;
+      const precoTxt = gratis ? '📞 Via WhatsApp' : `R$ ${brl(item.preco)}`;
+      html+=`<div class="card${itemEsg?' card-esgotado':''}">
+        <div>
+          <h3>${item.nome}${itemEsg?'<span class="badge-esg">ESGOTADO</span>':''}</h3>
+          ${item.desc?`<div class="desc">${item.desc}</div>`:''}
+          <div class="precos">${precoTxt}</div>
+        </div>
+        ${gratis
+          ? `<button class="btn-add" onclick="window.open('https://wa.me/${WHATSAPP}','_blank')">Encomendar</button>`
+          : itemEsg
+            ? `<button class="btn-add btn-esg" disabled>Esgotado</button>`
+            : `<button class="btn-add" onclick="abrirItem('${cat}',${j})">Adicionar</button>`
+        }
+      </div>`;
+    });
+    c.innerHTML+=html;
+  });
+}
+
+// ═══════════════════════════════════════════
+//  MODAL DE ITEM
+// ═══════════════════════════════════════════
+function abrirItem(cat,j){
+  if(!LOJA_ABERTA){alert('A loja está fechada no momento. Volte mais tarde! 🙏');return;}
+  itemAtual=JSON.parse(JSON.stringify(MENU[cat].itens[j]));
+  itemAtual.cat=cat;
+  qtdAtual=1;
+  document.getElementById('qtdItem').textContent=1;
+  document.getElementById('itemNome').textContent=itemAtual.nome;
+  renderItemConteudo();
+  document.getElementById('modalItem').classList.add('aberto');
+}
+
+function renderItemConteudo(){
+  let h='';
+  if(itemAtual.desc)h+=`<p class="desc" style="margin-bottom:10px">${itemAtual.desc}</p>`;
+  document.getElementById('itemConteudo').innerHTML=h;
+  atualizarPrecoItem();
+}
+
+function mudarQtd(d){qtdAtual=Math.max(1,qtdAtual+d);document.getElementById('qtdItem').textContent=qtdAtual;atualizarPrecoItem();}
+
+function precoUnit(){ return itemAtual.preco || 0; }
+function atualizarPrecoItem(){ document.getElementById('precoItemBtn').textContent=brl(precoUnit()*qtdAtual); }
+
+function adicionarAoCarrinho(){
+  carrinho.push({nome:itemAtual.nome, detalhe:'', preco:precoUnit(), qtd:qtdAtual});
+  fecharModal('modalItem');
+  atualizarCarrinho();
+}
+
+// ═══════════════════════════════════════════
+//  CARRINHO
+// ═══════════════════════════════════════════
+function totalCarrinho(){return carrinho.reduce((s,i)=>s+i.preco*i.qtd,0)}
+function atualizarCarrinho(){
+  const n=carrinho.reduce((s,i)=>s+i.qtd,0);
+  document.getElementById('qtdCarrinho').textContent=n;
+  document.getElementById('totalBarra').textContent=brl(totalCarrinho());
+}
+function abrirCarrinho(){ renderCarrinho(); document.getElementById('modalCarrinho').classList.add('aberto'); }
+function renderCarrinho(){
+  const l=document.getElementById('listaCarrinho');
+  if(!carrinho.length){
+    l.innerHTML='<div class="vazio">Seu carrinho está vazio 🛒</div>';
+    document.getElementById('formCheckout').style.display='none';
+    document.getElementById('btnIrCheckout').style.display='none';
+  } else {
+    l.innerHTML=carrinho.map((i,idx)=>`<div class="item-carrinho">
+      <div class="info"><strong>${i.qtd}x ${i.nome}</strong>
+      ${i.detalhe?`<div class="det">${i.detalhe}</div>`:''}</div>
+      <div style="text-align:right"><div>R$ ${brl(i.preco*i.qtd)}</div>
+      <button class="rm" onclick="removerItem(${idx})">remover</button></div></div>`).join('');
+    document.getElementById('btnIrCheckout').style.display =
+      document.getElementById('formCheckout').style.display==='block'?'none':'block';
+  }
+  document.getElementById('totalModal').textContent=brl(totalCarrinho());
+}
+function removerItem(i){carrinho.splice(i,1);atualizarCarrinho();renderCarrinho();}
+function irParaCheckout(){
+  document.getElementById('formCheckout').style.display='block';
+  document.getElementById('btnIrCheckout').style.display='none';
+  togglePagamento(); atualizarTotais();
+}
+function toggleEndereco(){
+  document.getElementById('boxEndereco').style.display=
+    document.getElementById('cliEntrega').value==='Entrega'?'block':'none';
+  atualizarTotais();
+}
+function bairroSel(){
+  const s=document.getElementById('cliBairro');
+  if(!s) return {nome:'',taxa:0};
+  const op=s.options[s.selectedIndex];
+  return {nome: op.getAttribute('data-nome')||'', taxa: parseFloat(s.value)||0};
+}
+function taxaAtual(){
+  if(document.getElementById('cliEntrega').value!=='Entrega') return 0;
+  return bairroSel().taxa;
+}
+function atualizarTotais(){
+  const el=document.getElementById('resumoTotais'); if(!el) return;
+  const sub=totalCarrinho(), taxa=taxaAtual(), tot=sub+taxa;
+  let h=`<div class="lin"><span>Subtotal</span><span>R$ ${brl(sub)}</span></div>`;
+  if(taxa>0) h+=`<div class="lin"><span>Taxa de entrega</span><span>R$ ${brl(taxa)}</span></div>`;
+  h+=`<div class="lin tot"><span>Total</span><span>R$ ${brl(tot)}</span></div>`;
+  el.innerHTML=h;
+}
+
+// ═══════════════════════════════════════════
+//  PAGAMENTO — toggle entre PIX e Cartão Online
+// ═══════════════════════════════════════════
+let mpBricks = null;
+function togglePagamento(){
+  const pg=document.querySelector('input[name=pg]:checked').value;
+  document.getElementById('boxPix').style.display = pg==='Pix' ? 'block':'none';
+  document.getElementById('boxMercadoPago').style.display = pg==='Cartão Online' ? 'block':'none';
+  document.getElementById('btnEnviarZap').style.display = pg==='Cartão Online' ? 'none':'block';
+  if(pg==='Cartão Online') iniciarMercadoPago();
+}
+
+function iniciarMercadoPago(){
+  if(MP_PUBLIC_KEY.includes("COLE_")){
+    document.getElementById('mp-container').innerHTML=
+      '<p style="color:#c0392b;font-size:.85rem;padding:10px">⚠️ Chave do Mercado Pago ainda não configurada. Fale com o administrador.</p>';
+    return;
+  }
+  if(mpBricks) return; // já iniciado
+  const mp = new MercadoPago(MP_PUBLIC_KEY, {locale:'pt-BR'});
+  const bricksBuilder = mp.bricks();
+  const total = totalCarrinho() + taxaAtual();
+  bricksBuilder.create("cardPayment","mp-container",{
+    initialization:{amount: total},
+    customization:{
+      visual:{style:{theme:'default',customVariables:{baseColor:'#2C1200',baseColorFirstVariant:'#5C2D00',baseColorSecondVariant:'#D4961A'}}},
+      paymentMethods:{maxInstallments:1}
+    },
+    callbacks:{
+      onReady:()=>{ mpBricks=true; },
+      onSubmit:(cardData)=>{
+        // Aqui você integraria com seu backend para processar o pagamento
+        // Por enquanto notifica via WhatsApp e redireciona
+        alert('Pagamento enviado! Confirme no WhatsApp.');
+        enviarWhatsAppComPagamento('Cartão Online (Mercado Pago)');
+        return new Promise(resolve=>resolve());
+      },
+      onError:(err)=>console.error(err),
+    }
+  });
+}
+
+function copiarPix(){
+  const k=document.getElementById('pixKey').textContent.trim();
+  if(navigator.clipboard){navigator.clipboard.writeText(k).then(()=>alert('Chave Pix copiada!'),()=>alert('Chave Pix: '+k));}
+  else{alert('Chave Pix: '+k);}
+}
+
+// ═══════════════════════════════════════════
+//  GEOLOCALIZAÇÃO
+// ═══════════════════════════════════════════
+let geoLink="";
+function pegarLocalizacao(){
+  const st=document.getElementById('localStatus');
+  if(!navigator.geolocation){
+    st.textContent='Seu aparelho não tem GPS. Descreva o endereço abaixo.';
+    document.getElementById('boxEndManual').style.display='block'; return;
+  }
+  st.textContent='Obtendo localização...';
+  navigator.geolocation.getCurrentPosition(
+    p=>{const la=p.coords.latitude.toFixed(6),ln=p.coords.longitude.toFixed(6);
+      geoLink=`https://maps.google.com/?q=${la},${ln}`;
+      st.innerHTML='✅ Localização capturada — <a href="'+geoLink+'" target="_blank">ver no mapa</a>';},
+    ()=>{geoLink=""; st.textContent='Não consegui pegar o GPS. Descreva o endereço abaixo.';
+      document.getElementById('boxEndManual').style.display='block';},
+    {enableHighAccuracy:true,timeout:10000}
+  );
+}
+
+// ═══════════════════════════════════════════
+//  WHATSAPP
+// ═══════════════════════════════════════════
+function enviarWhatsApp(){ enviarWhatsAppComPagamento(document.querySelector('input[name=pg]:checked').value); }
+
+function enviarWhatsAppComPagamento(pg){
+  if(!LOJA_ABERTA){alert('A loja está fechada no momento. Volte mais tarde! 🙏');return;}
+  const nome=document.getElementById('cliNome').value.trim();
+  const fone=document.getElementById('cliFone').value.trim();
+  const entrega=document.getElementById('cliEntrega').value;
+  const ref=document.getElementById('cliRef').value.trim();
+  const endManual=document.getElementById('cliEndereco')?document.getElementById('cliEndereco').value.trim():'';
+  const obs=document.getElementById('cliObs').value.trim();
+  const b=bairroSel();
+  if(!nome){alert('Por favor, informe seu nome.');return;}
+  if(entrega==='Entrega' && !b.nome){alert('Selecione a região de entrega.');return;}
+  if(entrega==='Entrega' && !geoLink && !endManual && !ref){alert('Envie sua localização ou descreva onde você está.');return;}
+  const sub=totalCarrinho(), taxa=taxaAtual(), tot=sub+taxa;
+  let msg=`*NOVO PEDIDO — Pão Caseiro da Elane* 🍞%0A%0A`;
+  msg+=`*Cliente:* ${nome}%0A`;
+  if(fone)msg+=`*WhatsApp:* ${fone}%0A`;
+  msg+=`*Tipo:* ${entrega}%0A`;
+  if(entrega==='Entrega'){
+    msg+=`*Região:* ${b.nome}%0A`;
+    if(geoLink)msg+=`*Localização:* ${encodeURIComponent(geoLink)}%0A`;
+    if(ref)msg+=`*Referência:* ${ref}%0A`;
+    if(endManual)msg+=`*Endereço:* ${endManual}%0A`;
+  }
+  msg+=`%0A*Itens:*%0A`;
+  carrinho.forEach(i=>{
+    msg+=`• ${i.qtd}x ${i.nome} — R$ ${brl(i.preco*i.qtd)}%0A`;
+    if(i.detalhe)msg+=`  _${i.detalhe}_%0A`;
+  });
+  msg+=`%0A*Subtotal: R$ ${brl(sub)}*%0A`;
+  if(taxa>0)msg+=`*Taxa de entrega: R$ ${brl(taxa)}*%0A`;
+  msg+=`*Total: R$ ${brl(tot)}*%0A`;
+  msg+=`*Pagamento:* ${pg}%0A`;
+  if(pg==='Pix')msg+=`*Chave Pix:* ${PIX}%0A_Envie o comprovante aqui para confirmar o pedido._%0A`;
+  if(pg.includes('Cartão Online'))msg+=`_Pagamento via Mercado Pago — aguardando confirmação._%0A`;
+  if(obs)msg+=`*Obs:* ${obs}%0A`;
+  gravarPedido({
+    cliente:nome, telefone:fone||null, tipo:entrega, bairro:(entrega==='Entrega'?b.nome:null),
+    itens:carrinho.map(i=>({nome:i.nome,detalhe:i.detalhe,preco:i.preco,qtd:i.qtd})),
+    total:tot, taxa_entrega:taxa, pagamento:pg,
+    localizacao:geoLink||null, referencia:ref||null, endereco:endManual||null,
+    obs:obs||null, origem:'cardapio'
+  });
+  window.open(`https://wa.me/${WHATSAPP}?text=${msg}`,'_blank');
+}
+
+function fecharModal(id){document.getElementById(id).classList.remove('aberto');}
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('aberto');}));
+
+/* init */
+montarAbas(); carregarConfig(); atualizarCarrinho();
+</script>
+</body>
+</html>
