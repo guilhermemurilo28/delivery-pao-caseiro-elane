@@ -357,15 +357,18 @@ const FN = `${SUPABASE_URL}/functions/v1/painel`;
 
 const ITENS_MENU = [
   "Proteina","Frango Molho Limao","Frango Xadrez","Strogonoff de Frango","Frango Curry","File de Peixe no Alecrim",
-  "Lasanha 500ml","Lasanha 750ml","Empadao de Frango","Empadao de Camarao",
+  "Lasanha de Carne 500ml","Lasanha de Carne 750ml","Lasanha de Frango 500ml","Lasanha de Frango 750ml",
+  "Empadao de Frango","Empadao de Camarao",
   "File a Parmegiana","File de Peixe ao Molho de Coco",
   "Creme de Camarao","Creme de Galinha",
-  "Yakisoba de Frango","Yakisoba de Camarao","Yakisoba de Carne","Yakisoba Misto",
+  "Yakisoba de Frango 500ml","Yakisoba de Frango 750ml",
+  "Yakisoba de Camarao 500ml","Yakisoba de Camarao 750ml",
+  "Yakisoba de Carne 500ml","Yakisoba de Carne 750ml","Yakisoba Misto 500ml","Yakisoba Misto 750ml",
   "Espaguete a Bolonhesa","Espaguete de Camarao","Espaguete de Frango ao Molho Branco",
-  "Espaguete de Cheddar com Bacon","Espaguete de Brocolis ao Molho Branco","Espaguete Carbonara",
+  "Espaguete Cheddar com Bacon","Espaguete de Brocolis ao Molho Branco","Espaguete Carbonara",
   "Rigatoni de Camarao","Rigatoni de File",
-  "Pastel Carne Azeitona Milho e Catupiry","Pastel Frango com Catupiry e Queijo",
-  "Pastel Camarao com Catupiry e Queijo","Pastel Bacon com Cheddar e Frango",
+  "Pastel Carne Azeitona Milho Catupiry","Pastel Frango Catupiry e Queijo",
+  "Pastel Camarao Catupiry e Queijo","Pastel Bacon Cheddar e Frango",
   "Hamburguer","X-Bacon","X-Calabresa","X-Frango","X-Pao Caseiro da Elane"
 ];
 
@@ -376,6 +379,7 @@ let periodo = "hoje";
 let charts = {};
 let refreshTimer = null;
 let refreshCountdown = 60;
+let lojaAberta = true;
 
 // ---- UTILS ----
 function brl(v){ return 'R$ '+(Number(v)||0).toFixed(2).replace('.',','); }
@@ -402,12 +406,19 @@ async function entrar(){
       localStorage.setItem('painel_senha_elane', senha);
       document.getElementById('login').style.display='none';
       document.getElementById('app').style.display='block';
-      const d = await r.json(); pedidos = d.pedidos||[];
-      setDefaultManualDate(); render(); carregarStatus(); carregarEsgotados();
+      const d = await r.json();
+      pedidos = d.pedidos||[];
+      setDefaultManualDate();
+      render();
+      carregarStatus();
+      carregarEsgotados();
       iniciarRefresh();
-    } else if(r.status===401){ er.textContent='Senha incorreta.'; }
-    else { er.textContent='Erro ao conectar.'; }
-  } catch(e){ er.textContent='Sem conexao. Tente novamente.'; }
+    } else if(r.status===401){
+      er.textContent='Senha incorreta.';
+    } else {
+      er.textContent='Erro ao conectar. Tente novamente.';
+    }
+  } catch(e){ er.textContent='Sem conexao. Verifique sua internet.'; }
 }
 function sair(){ localStorage.removeItem('painel_senha_elane'); location.reload(); }
 
@@ -418,10 +429,7 @@ function iniciarRefresh(){
   atualizarContador();
   refreshTimer = setInterval(async () => {
     refreshCountdown--;
-    if(refreshCountdown <= 0){
-      refreshCountdown = 60;
-      await carregar();
-    }
+    if(refreshCountdown <= 0){ refreshCountdown = 60; await carregar(); }
     atualizarContador();
   }, 1000);
 }
@@ -429,8 +437,7 @@ function atualizarContador(){
   const el = document.getElementById('refreshInfo');
   if(el) el.textContent = `Atualiza em ${refreshCountdown}s`;
 }
-
-arync function carregar(){
+async function carregar(){
   const r = await chamar({acao:'listar'});
   if(r.status===200){ const d=await r.json(); pedidos=d.pedidos||[]; render(); }
   else if(r.status===401){ sair(); }
@@ -439,8 +446,10 @@ arync function carregar(){
 // ---- FILTROS ----
 function setPeriodo(el){
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('ativo'));
-  el.classList.add('ativo'); periodo = el.dataset.p;
-  document.getElementById('dtIni').value=''; document.getElementById('dtFim').value='';
+  el.classList.add('ativo');
+  periodo = el.dataset.p;
+  document.getElementById('dtIni').value='';
+  document.getElementById('dtFim').value='';
   render();
 }
 function setPersonalizado(){
@@ -455,7 +464,7 @@ function filtrar(){
   else if(periodo==='7'){ ini=inicioDia(agora); ini.setDate(ini.getDate()-6); }
   else if(periodo==='30'){ ini=inicioDia(agora); ini.setDate(ini.getDate()-29); }
   else if(periodo==='mes') ini=new Date(agora.getFullYear(),agora.getMonth(),1);
-  else if(periodo==='tudo'){ ini=new Date(2000,0,1); }
+  else if(periodo==='tudo') ini=new Date(2000,0,1);
   else if(periodo==='custom'){
     ini=new Date(document.getElementById('dtIni').value+'T00:00:00');
     fim=new Date(document.getElementById('dtFim').value+'T23:59:59');
@@ -493,11 +502,7 @@ function renderCharts(f){
   f.forEach(p=>{ (p.itens||[]).forEach(i=>{ if(i&&i.nome) itc[i.nome]=(itc[i.nome]||0)+(Number(i.qtd)||1); }); });
   const rank=Object.entries(itc).sort((a,b)=>b[1]-a[1]).slice(0,10);
   document.getElementById('rankItens').innerHTML = rank.length
-    ? rank.map(([n,q],i)=>`<div class="rank-item">
-        <span class="rank-num${i===0?' gold':''}">${i+1}</span>
-        <span class="rank-name">${n}</span>
-        <span class="rank-qty">${q}x</span>
-      </div>`).join('')
+    ? rank.map(([n,q],i)=>`<div class="rank-item"><span class="rank-num${i===0?' gold':''}">${i+1}</span><span class="rank-name">${n}</span><span class="rank-qty">${q}x</span></div>`).join('')
     : `<p style="color:var(--muted);font-size:.85rem;padding:20px;text-align:center">Sem dados no periodo</p>`;
 }
 
@@ -506,272 +511,53 @@ function desenhar(id,tipo,labels,data,label,cor,fill){
   charts[id]=new Chart(document.getElementById(id),{
     type:tipo,
     data:{labels,datasets:[{label,data,backgroundColor:cor,borderColor:cor,borderRadius:4,fill:fill}]},
-    options:{
-      plugins:{legend:{display:false}},
-      scales:{
-        y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#6B6B80',font:{size:11}}},
-        x:{grid:{color:'rgba(255,255,255,.03)'},ticks:{color:'#6B6B80',font:{size:10}}}
-      },
-      maintainAspectRatio:false
-    }
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#6B6B80',font:{size:11}}},x:{grid:{color:'rgba(255,255,255,.03)'},ticks:{color:'#6B6B80',font:{size:10}}}},maintainAspectRatio:false}
   });
 }
-
 function desenharPie(id,labels,data){
   if(charts[id]) charts[id].destroy();
   const colors=['rgba(212,150,26,.85)','rgba(59,130,246,.85)','rgba(34,197,94,.85)','rgba(239,68,68,.85)','rgba(168,85,247,.85)'];
   charts[id]=new Chart(document.getElementById(id),{
     type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0}]},
-    options:{
-      plugins:{legend:{position:'bottom',labels:{color:'#6B6B80',font:{size:11},padding:12}}},
-      maintainAspectRatio:false,
-      cutout:'60%'
-    }
+    options:{plugins:{legend:{position:'bottom',labels:{color:'#6B6B80',font:{size:11},padding:12}}},maintainAspectRatio:false,cutout:'60%'}
   });
 }
 
 function renderTable(f){
   const tbody=document.getElementById('tblBody');
   document.getElementById('tblCount').textContent=`${f.length} pedido${f.length!==1?'s':''}`;
-  if(!f.length){ tbody.innerHTML=`<tr class="empty-row"><td colspan="9">Nenhum pedido no periodo</td></tr>`; return; }
-  const sorted=[...f].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-  tbody.innerHTML=sorted.map(p=>{
-    const itens=(p.itens||[]).map(i=>`${i.qtd||1}x ${i.nome||i}`).join(', ')||p.descricao||'—';
-    const origem=p.origem==='manual'
-      ?`<span class="badge badge-manual">Manual</span>`
-      :`<span class="badge badge-site">Site</span>`;
-    return `<tr>
-      <td>${fmt(p.created_at)}</td>
-      <td>${p.cliente||'—'}</td>
-      <td>${p.telefone||'—'}</td>
-      <td>${p.regiao||'—'}</td>
-      <td style="max-width:180px;white-space:normal;font-size:.8rem">${itens}</td>
-      <td><strong>${brl(p.total)}</strong></td>
-      <td>${p.pagamento||'—'}</td>
-      <td>${origem}</td>
-      <td><button class="del-btn" onclick="deletar('${p.id}')">Excluir</button></td>
-    </tr>`;
-  }).join('');
-}
-
-async function addVenda(){
-  const data=document.getElementById('mData').value;
-  const desc=document.getElementById('mDesc').value.trim();
-  const valor=parseFloat(document.getElementById('mValor').value);
-  const err=document.getElementById('mErro');
-  if(!data||!desc||isNaN(valor)||valor<=0){ err.textContent='Preencha data, descricao e valor.'; return; }
-  err.textContent='';
-  const payload={
-    acao:'adicionar',
-    created_at:new Date(data).toISOString(),
-    cliente:document.getElementById('mCliente').value.trim()||null,
-    telefone:document.getElementById('mFone').value.trim()||null,
-    descricao:desc,
-    itens:[{nome:desc,qtd:parseInt(document.getElementById('mQtd').value)||1}],
-    total:valor,
-    pagamento:document.getElementById('mPg').value,
-    origem:'manual'
-  };
-  const btn=document.querySelector('#modalPedido .btn-gold');
-  btn.textContent='Salvando...'; btn.disabled=true;
-  const r=await chamar(payload);
-  btn.textContent='Registrar'; btn.disabled=false;
-  if(r.status===200){
-    fecharModal('modalPedido'); await carregar(); setDefaultManualDate();
-  } else { err.textContent='Erro ao salvar. Tente novamente.'; }
-}
-
-async function deletar(id){
-  if(!confirm('Excluir este pedido?')) return;
-  const r=await chamar({acao:'deletar',id});
-  if(r.status===200) await carregar();
-  else alert('Erro ao excluir.');
-}
-
-async function carregarStatus(){
-  const r=await chamar({acao:'statusLoja'});
-  if(r.status===200){ const d=await r.json(); atualizarStatusUI(d.aberta!==false); }
-}
-
-function atualizarStatusUI(aberta){
-  const txt=document.getElementById('lojaTxt');
-  const btn=document.getElementById('btnLoja');
-  if(aberta){
-    txt.textContent='ABERTA'; txt.className='status-value status-open';
-    btn.textContent='Fechar loja'; btn.className='btn btn-loja-open';
-  } else {
-    txt.textContent='FECHADA'; txt.className='status-value status-closed';
-    btn.textContent='Abrir loja'; btn.className='btn btn-loja-closed';
-  }
-}
-
-async function toggleLoja(){
-  const aberta=document.getElementById('lojaTxt').textContent==='ABERTA';
-  const r=await chamar({acao:'toggleLoja',aberta:!aberta});
-  if(r.status===200) atualizarStatusUI(!aberta);
-  else alert('Erro ao alterar status.');
-}
-
-async function carregarEsgotados(){
-  const r=await chamar({acao:'esgotados'});
-  if(r.status===200){ const d=await r.json(); esgotatosSel=d.esgotados||[]; }
-  renderEsgotados();
-}
-
-function renderEsgotados(){
-  const grid=document.getElementById('esgList');
-  grid.innerHTML=ITENS_MENU.map(nome=>`
-    <label class="esg-item">
-      <input type="checkbox" ${esgotatosSel.includes(nome)?'checked':''} onchange="toggleEsg('${nome}',this.checked)">
-      <span>${nome}</span>
-    </label>`).join('');
-}
-
-function toggleEsg(nome,checked){
-  if(checked){ if(!esgotatosSel.includes(nome)) esgotatosSel.push(nome); }
-  else { esgotatosSel=esgotatosSel.filter(x=>x!==nome); }
-}
-
-async function salvarEsgotados(){
-  const msg=document.getElementById('esgMsg');
-  msg.textContent='Salvando...';
-  const r=await chamar({acao:'salvarEsgotados',esgotados:esgotatosSel});
-  msg.textContent=r.status===200?'Salvo!':'Erro.';
-  setTimeout(()=>msg.textContent='',2000);
-}
-
-function exportarCSV(){
-  const f=filtrar();
-  if(!f.length){ alert('Nenhum pedido no periodo.'); return; }
-  const rows=[['Data','Cliente','Telefone','Regiao','Itens','Total','Pagamento','Origem']];
-  f.forEach(p=>{
-    const itens=(p.itens||[]).map(i=>`${i.qtd||1}x ${i.nome||i}`).join(' | ')||p.descricao||'';
-    rows.push([fmt(p.created_at),p.cliente||'',p.telefone||'',p.regiao||'',itens,p.total,p.pagamento||'',p.origem||'']);
-  });
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=`vendas_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-}
-
-function exportarClientes(){
-  const vistos=new Map();
-  pedidos.forEach(p=>{ if(p.telefone&&!vistos.has(p.telefone)) vistos.set(p.telefone,{nome:p.cliente||'',tel:p.telefone,qtd:0,total:0}); if(p.telefone){ vistos.get(p.telefone).qtd++; vistos.get(p.telefone).total+=Number(p.total||0); } });
-  const rows=[['Nome','Telefone','Pedidos','Total gasto']];
-  [...vistos.values()].sort((a,b)=>b.total-a.total).forEach(c=>rows.push([c.nome,c.tel,c.qtd,c.total.toFixed(2)]));
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=`clientes_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-}
-
-async function trocarSenha(){
-  const nova=prompt('Nova senha (minimo 6 caracteres):');
-  if(!nova||nova.length<6){ alert('Senha muito curta.'); return; }
-  const r=await chamar({acao:'trocarSenha',nova_senha:nova});
-  if(r.status===200){ senha=nova; localStorage.setItem('painel_senha_elane',nova); alert('Senha alterada!'); }
-  else alert('Erro ao trocar senha.');
-}
-
-function abrirModal(id){ document.getElementById(id).classList.add('open'); if(id==='modalEsg') renderEsgotados(); }
-function fecharModal(id){ document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
-
-function setDefaultManualDate(){
-  const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
-  document.getElementById('mData').value=now.toISOString().slice(0,16);
-}
-
-(function(){
-  if(senha){
-    document.getElementById('login').style.display='none';
-    document.getElementById('app').style.display='block';
-    chamar({acao:'listar'}).then(async r=>{
-      if(r.status===200){ const d=await r.json(); pedidos=d.pedidos||[]; render(); carregarStatus(); carregarEsgotados(); iniciarRefresh(); }
-      else { localStorage.removeItem('painel_senha_elane'); location.reload(); }
-    });
-  }
-})();
-</script>
-</body>
-</html>
-ados(); iniciarRefresh(); }
-      else { localStorage.removeItem('painel_senha_elane'); location.reload(); }
-    });
-  }
-})();
-</script>
-</body>
-</html>ank-item">
-        <span class="rank-num${i===0?' gold':''}">${i+1}</span>
-        <span class="rank-name">${n}</span>
-        <span class="rank-qty">${q}x</span>
-      </div>`).join('')
-    : `<p style="color:var(--muted);font-size:.85rem;padding:20px;text-align:center">Sem dados no periodo</p>`;
-}
-
-function desenhar(id,tipo,labels,data,label,cor,fill){
-  if(charts[id]) charts[id].destroy();
-  charts[id]=new Chart(document.getElementById(id),{
-    type:tipo,
-    data:{labels,datasets:[{label,data,backgroundColor:cor,borderColor:cor,borderRadius:4,fill:fill}]},
-    options:{
-      plugins:{legend:{display:false}},
-      scales:{
-        y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#6B6B80',font:{size:11}}},
-        x:{grid:{color:'rgba(255,255,255,.03)'},ticks:{color:'#6B6B80',font:{size:10}}}
-      },
-      maintainAspectRatio:false
-    }
-  });
-}
-function desenharPie(id,labels,data){
-  if(charts[id]) charts[id].destroy();
-  charts[id]=new Chart(document.getElementById(id),{
-    type:'doughnut',
-    data:{labels,datasets:[{data,backgroundColor:['#D4961A','#3B82F6','#22C55E','#EF4444','#8B5CF6','#F59E0B']}]},
-    options:{plugins:{legend:{position:'bottom',labels:{color:'#6B6B80',font:{size:11},padding:12}}},maintainAspectRatio:false}
-  });
-}
-
-function renderTable(f){
-  document.getElementById('tblCount').textContent = `${f.length} pedido${f.length!==1?'s':''}`;
-  document.getElementById('tblBody').innerHTML = f.length ? f.map(p=>{
-    const itens=(p.itens||[]).map(i=>`${i.qtd}x ${i.nome}`).join(', ')||(p.obs||'&mdash;');
-    const bcls=p.origem==='manual'?'badge-manual':'badge-site';
+  if(!f.length){ tbody.innerHTML<`<tr class="empty-row"><td colspan="9">Nenhum pedido no periodo</td></tr>`; return; }
+  tbody.innerHTML=[...f].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(p=>{
+    const itens=(p.itens||[]).map(i=>`${i.qtd||1}x ${i.nome||i}`).join(', ')||p.obs||'&mdash;';
+    const bc=p.origem==='manual'?'badge-manual':'badge-site';
     return `<tr>
       <td>${fmt(p.created_at)}</td>
       <td>${p.cliente||'&mdash;'}</td>
       <td>${p.telefone||'&mdash;'}</td>
       <td>${p.bairro||'&mdash;'}</td>
-      <td style="max-width:200px;font-size:.8rem">${itens}</td>
-      <td><strong style="color:var(--gold)">${brl(p.total)}</strong></td>
+      <td style="max-width:180px;white-space:normal;font-size:.8rem">${itens}</td>
+      <td><strong>${brl(p.total)}</strong></td>
       <td>${p.pagamento||'&mdash;'}</td>
-      <td><span class="badge ${bcls}">${p.origem==='manual'?'manual':'site'}</span></td>
-      <td><button class="del-btn" onclick="excluir('${p.id}')">excluir</button></td>
+      <td><span class="badge ${bc}">${p.origem==='manual'?'Manual':'Site'}</span></td>
+      <td><button class="del-btn" onclick="excluir('${p.id}')">Excluir</button></td>
     </tr>`;
-  }).join('') : `<tr class="empty-row"><td colspan="9">Nenhum pedido no periodo selecionado.</td></tr>`;
+  }).join('');
 }
 
-// ---- LOJA STATUS ----
-let lojaAberta = true;
+// ---- STATUS LOJA ----
 async function carregarStatus(){
   try{
     const r=await fetch(`${SUPABASE_URL}/rest/v1/config?select=loja_aberta&id=eq.1`,{headers:{'apikey':ANON,'Authorization':`Bearer ${ANON}`}});
-    const d=await r.json(); lojaAberta=(d&&d[0])?d[0].loja_aberta:true;
+    const d=await r.json();
+    lojaAberta=(d&&d[0])?d[0].loja_aberta!==false:true;
   }catch(e){}
   pintarStatus();
 }
 function pintarStatus(){
   const t=document.getElementById('lojaTxt'), b=document.getElementById('btnLoja');
-  if(lojaAberta){
-    t.textContent='ABERTA'; t.className='status-value status-open';
-    b.textContent='Fechar loja'; b.className='btn btn-loja-open';
-  } else {
-    t.textContent='FECHADA'; t.className='status-value status-closed';
-    b.textContent='Abrir loja'; b.className='btn btn-loja-closed';
-  }
+  if(lojaAberta){ t.textContent='ABERTA'; t.className='status-value status-open'; b.textContent='Fechar loja'; b.className='btn btn-loja-open'; }
+  else { t.textContent='FECHADA'; t.className='status-value status-closed'; b.textContent='Abrir loja'; b.className='btn btn-loja-closed'; }
 }
 async function toggleLoja(){
   const r=await chamar({acao:'set_loja',aberta:!lojaAberta});
@@ -783,20 +569,19 @@ async function toggleLoja(){
 async function carregarEsgotados(){
   try{
     const r=await fetch(`${SUPABASE_URL}/rest/v1/config?select=esgotados&id=eq.1`,{headers:{'apikey':ANON,'Authorization':`Bearer ${ANON}`}});
-    const d=await r.json(); esgotadosSel=(d&&d[0]&&Array.isArray(d[0].esgotados))?d[0].esgotados:[];
+    const d=await r.json();
+    esgotadosSel=(d&&d[0]&&Array.isArray(d[0].esgotados))?d[0].esgotados:[];
   }catch(e){ esgotadosSel=[]; }
   renderEsg();
 }
 function renderEsg(){
-  const set=esgotadosSel.map(x=>String(x).toLowerCase());
-  document.getElementById('esgList').innerHTML=ITENS_MENU.map(n=>{
-    const ck=set.includes(n.toLowerCase())?'checked':'';
-    return `<label class="esg-item"><input type="checkbox" value="${n}" ${ck}>${n}</label>`;
-  }).join('');
+  const sel=esgotadosSel.map(x=>String(x).toLowerCase());
+  document.getElementById('esgList').innerHTML=ITENS_MENU.map(n=>`<label class="esg-item"><input type="checkbox" value="${n}" ${sel.includes(n.toLowerCase())?'checked':''}><span>${n}</span></label>`).join('');
 }
 async function salvarEsgotados(){
   const lista=[...document.querySelectorAll('#esgList input:checked')].map(i=>i.value);
-  const m=document.getElementById('esgMsg'); m.style.color='var(--muted)'; m.textContent='Salvando...';
+  const m=document.getElementById('esgMsg');
+  m.style.color='var(--muted)'; m.textContent='Salvando...';
   const r=await chamar({acao:'set_esgotados',lista});
   if(r.status===200){ esgotadosSel=lista; m.style.color='var(--success)'; m.textContent='Salvo!'; setTimeout(()=>m.textContent='',3000); }
   else { m.style.color='var(--danger)'; m.textContent='Erro ao salvar.'; }
@@ -808,7 +593,7 @@ function setDefaultManualDate(){
   document.getElementById('mData').value=n.toISOString().slice(0,16);
 }
 async function addVenda(){
-  const er=document.getElementById('mErro'); er.textContent='';
+  const er=document.getElementById('mErro'); er.textContent=''; er.style.color='';
   const valor=parseFloat(document.getElementById('mValor').value);
   if(!valor||valor<=0){ er.textContent='Informe um valor valido.'; return; }
   const data=document.getElementById('mData').value;
@@ -817,72 +602,84 @@ async function addVenda(){
   const cliente=document.getElementById('mCliente').value.trim()||'Venda manual';
   const fone=document.getElementById('mFone').value.trim();
   const qtd=parseInt(document.getElementById('mQtd').value)||1;
+  const btn=document.querySelector('#modalPedido .btn-gold');
+  btn.textContent='Salvando...'; btn.disabled=true;
   const r=await chamar({
     acao:'add_venda', total:valor, pagamento:pg, cliente, telefone:fone||null, obs:desc||null,
     created_at: data?new Date(data).toISOString():new Date().toISOString(),
     itens: desc?[{nome:desc,qtd,preco:+(valor/qtd).toFixed(2)}]:null
   });
+  btn.textContent='Registrar'; btn.disabled=false;
   if(r.status===200){
     ['mValor','mDesc','mCliente','mFone'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('mQtd').value='1';
-    er.style.color='var(--success)'; er.textContent='Pedido registrado!';
+    er.style.color='var(--success)'; er.textContent='Registrado!';
     setTimeout(()=>{er.textContent='';er.style.color='';fecharModal('modalPedido');},1200);
     carregar();
-  } else { er.textContent='Erro ao registrar.'; }
+  } else { er.textContent='Erro ao registrar. Tente novamente.'; }
 }
 
 // ---- EXCLUIR ----
 async function excluir(id){
-  if(!confirm('Excluir este pedido?')) return;
+  if(!confirm('Excluir aste pedido?')) return;
   const r=await chamar({acao:'excluir',id});
   if(r.status===200) carregar();
+  else alert('Erro ao excluir.');
 }
 
 // ---- EXPORTS ----
 function exportarCSV(){
   const f=filtrar();
-  const linhas=[['Data','Cliente','Telefone','Tipo','Regiao','Itens','Total','Taxa','Pagamento','Origem','Localizacao','Referencia','Endereco','Obs']];
+  if(!f.length){ alert('Nenhum pedido no periodo.'); return; }
+  const rows=[['Data','Cliente','Telefone','Tipo','Regiao','Itens','Total','Taxa','Pagamento','Origem','Obs']];
   f.forEach(p=>{
-    const itens=(p.itens||[]).map(i=>`${i.qtd}x ${i.nome}`).join('; ');
-    linhas.push([fmt(p.created_at),p.cliente||'',p.telefone||'',p.tipo||'',p.bairro||'',itens,
-      Number(p.total||0).toFixed(2),Number(p.taxa_entrega||0).toFixed(2),
-      p.pagamento||'',p.origem||'',p.localizacao||'',p.referencia||'',p.endereco||'',p.obs||'']);
+    const itens=(p.itens||[]).map(i=>`${i.qtd||1}x ${i.nome||i}`).join(' | ')||p.obs||'';
+    rows.push([fmt(p.created_at),p.cliente||'',p.telefone||'',p.tipo||'',p.bairro||'',itens,
+      Number(p.total||0).toFixed(2),Number(p.taxa_entrega||0).toFixed(2),p.pagamento||'',p.origem||'',p.obs||'']);
   });
-  baixarCSV(linhas,'vendas-pao-caseiro-elane.csv');
+  baixarCSV(rows,'vendas-pao-caseiro-elane.csv');
 }
 function exportarClientes(){
   const map=new Map();
   pedidos.forEach(p=>{ const t=(p.telefone||'').trim(); if(t&&!map.has(t)) map.set(t,p.cliente||''); });
-  if(!map.size){ alert('Sem telefones registrados ainda.'); return; }
-  const linhas=[['Nome','Telefone']];
-  map.forEach((n,t)=>linhas.push([n,t]));
-  baixarCSV(linhas,'clientes-pao-caseiro-elane.csv');
+  if(!map.size){ alert('Sem telefones registrados.'); return; }
+  const rows=[['Nome','Telefone']];
+  map.forEach((n,t)=>rows.push([n,t]));
+  baixarCSV(rows,'clientes-pao-caseiro-elane.csv');
 }
-function baixarCSV(linhas,nome){
-  const csv=linhas.map(l=>l.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+function baixarCSV(rows,nome){
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+  a.href=URL,createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
   a.download=nome; a.click();
 }
 
 // ---- SENHA ----
 async function trocarSenha(){
-  const nova=prompt('Digite a NOVA senha (minimo 6 caracteres):');
-  if(!nova) return;
-  if(nova.trim().length<6){ alert('Senha muito curta.'); return; }
+  const nova=prompt('Nova senha (minimo 6 caracteres):');
+  if(!nova||nova.trim().length<6){ alert('Senha muito curta.'); return; }
   const conf=prompt('Confirme a nova senha:');
-  if(conf!==nova){ alert('Senhas nao conferem.'); return; }
+  if(conf!==nova.trim()){ alert('Senhas nao conferem.'); return; }
   const r=await chamar({acao:'trocar_senha',nova:nova.trim()});
   if(r.status===200){ senha=nova.trim(); localStorage.setItem('painel_senha_elane',senha); alert('Senha alterada!'); }
-  else alert('Erro ao trocar a senha.');
+  else alert('Erro ao trocar senha.');
 }
 
 // ---- MODAIS ----
 function abrirModal(id){ document.getElementById(id).classList.add('open'); if(id==='modalEsg') renderEsg(); }
 function fecharModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
 
 // ---- BOOT ----
-if(senha) entrar();
+if(senha){
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  chamar({acao:'listar'}).then(async r=>{
+    if(r.status===200){ const d=await r.json(); pedidos=d.pedidos||[]; setDefaultManualDate(); render(); carregarStatus(); carregarEsgotados(); iniciarRefresh(); }
+    else { localStorage.removeItem('painel_senha_elane'); location.reload(); }
+  });
+}
+
 </script>
 </body>
 </html>
