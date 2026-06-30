@@ -232,8 +232,6 @@ body{background:var(--bg);color:var(--text)}
           <select id="bairro" onchange="calcTaxa()">
             <option value="">Selecione...</option>
             <option value="Canoa Quebrada">Canoa Quebrada &mdash; R$ 4,00</option>
-            <option value="Aracati Centro">Aracati Centro &mdash; R$ 4,00</option>
-            <option value="Estradas/outros">Estradas / outros &mdash; R$ 6,00</option>
           </select>
         </div>
       </div>
@@ -321,11 +319,11 @@ body{background:var(--bg);color:var(--text)}
 <script>
 // ===== CONFIG =====
 const SUPABASE_URL  = "https://fjlmdqxnxcitzfkumbow.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqbG1kcXnueGNpdHpma3VtYm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDY5NjYsImV4cCI6MjA5ODA4Mjk2Nn0.9B4kn9KUvDZzF9XVhFrd4JLMyBv2K2UIAXUrsWqfDFI";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqbG1kcXhueGNpdHpma3VtYm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDY5NjYsImV4cCI6MjA5ODA4Mjk2Nn0.9B4kn9KUvDZzF9XVhFrd4JLMyBv2K2UIAXUrsWqfDFI";
 const WHATSAPP      = "5588996073668";
 const PIX           = "d5f22d0d-b130-4615-91b6-7e887bcf2956";
 const MP_PUBLIC_KEY = "COLE_SUA_PUBLIC_KEY_MERCADO_PAGO_AQUI";
-const TAXA = {"Canoa Quebrada":4,"Aracati Centro":4,"Estradas/outros":6};
+const TAXA = {"Canoa Quebrada":4};
 
 // ===== CARDAPIO =====
 const CARDAPIO = [
