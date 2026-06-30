@@ -246,7 +246,7 @@ tr:hover td { background: var(--surface2); }
       <input type="date" class="date-input" id="dtIni" onchange="setPersonalizado()">
       <span class="date-sep">ate</span>
       <input type="date" class="date-input" id="dtFim" onchange="setPersonalizado()">
-      <span class="refresh-info" id="refreshInfo">Atualiza em 60s</span>
+      <span class="refresh-info" id="refreshInfo">Atualiza em 2min</span>
     </div>
 
     <!-- KPIs -->
@@ -378,7 +378,7 @@ let pedidos = [];
 let periodo = "hoje";
 let charts = {};
 let refreshTimer = null;
-let refreshCountdown = 60;
+let refreshCountdown = 120;
 let lojaAberta = true;
 
 // ---- UTILS ----
@@ -425,17 +425,20 @@ function sair(){ localStorage.removeItem('painel_senha_elane'); location.reload(
 // ---- REFRESH ----
 function iniciarRefresh(){
   if(refreshTimer) clearInterval(refreshTimer);
-  refreshCountdown = 60;
+  refreshCountdown = 120;
   atualizarContador();
   refreshTimer = setInterval(async () => {
     refreshCountdown--;
-    if(refreshCountdown <= 0){ refreshCountdown = 60; await carregar(); }
+    if(refreshCountdown <= 0){ refreshCountdown = 120; await carregar(); }
     atualizarContador();
   }, 1000);
 }
 function atualizarContador(){
   const el = document.getElementById('refreshInfo');
-  if(el) el.textContent = `Atualiza em ${refreshCountdown}s`;
+  if(!el) return;
+  const m = Math.floor(refreshCountdown/60);
+  const s = refreshCountdown % 60;
+  el.textContent = m > 0 ? `Atualiza em ${m}:${String(s).padStart(2,'0')}` : `Atualiza em ${s}s`;
 }
 async function carregar(){
   const r = await chamar({acao:'listar'});
@@ -486,14 +489,17 @@ function render(){
 }
 
 function renderCharts(f){
+  // Vendas por dia — gráfico de área (line + fill)
   const porDia={};
   f.forEach(p=>{ const k=new Date(p.created_at).toLocaleDateString('pt-BR'); porDia[k]=(porDia[k]||0)+Number(p.total||0); });
-  desenhar('chDia','bar',Object.keys(porDia),Object.values(porDia),'Vendas (R$)','rgba(212,150,26,.85)','rgba(212,150,26,.2)');
+  desenharArea('chDia',Object.keys(porDia),Object.values(porDia));
 
+  // Formas de pagamento — barras horizontais
   const porPg={};
   f.forEach(p=>{ const k=p.pagamento||'N/A'; porPg[k]=(porPg[k]||0)+Number(p.total||0); });
-  desenharPie('chPg',Object.keys(porPg),Object.values(porPg));
+  desenharBarraHorizontal('chPg',Object.keys(porPg),Object.values(porPg));
 
+  // Horários de pico — bar chart (mantido)
   const porHora=new Array(24).fill(0);
   f.forEach(p=>{ porHora[new Date(p.created_at).getHours()]++; });
   desenhar('chHora','bar',porHora.map((_,h)=>h+'h'),porHora,'Pedidos','rgba(59,130,246,.85)','rgba(59,130,246,.2)');
@@ -506,21 +512,61 @@ function renderCharts(f){
     : `<p style="color:var(--muted);font-size:.85rem;padding:20px;text-align:center">Sem dados no periodo</p>`;
 }
 
+function desenharArea(id,labels,data){
+  if(charts[id]) charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id),{
+    type:'line',
+    data:{labels,datasets:[{
+      label:'Vendas (R$)',data,
+      borderColor:'rgba(212,150,26,1)',
+      backgroundColor:'rgba(212,150,26,.15)',
+      pointBackgroundColor:'rgba(212,150,26,1)',
+      pointRadius:4,pointHoverRadius:6,
+      borderWidth:2,fill:true,tension:.35
+    }]},
+    options:{
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'R$ '+ctx.parsed.y.toFixed(2).replace('.',',')}}},
+      scales:{
+        y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#6B6B80',font:{size:11},callback:v=>'R$'+v}},
+        x:{grid:{color:'rgba(255,255,255,.03)'},ticks:{color:'#6B6B80',font:{size:10}}}
+      },
+      maintainAspectRatio:false
+    }
+  });
+}
+
+function desenharBarraHorizontal(id,labels,data){
+  if(charts[id]) charts[id].destroy();
+  const colors=['rgba(212,150,26,.85)','rgba(59,130,246,.85)','rgba(34,197,94,.85)','rgba(239,68,68,.85)','rgba(168,85,247,.85)'];
+  const total=data.reduce((s,v)=>s+v,0)||1;
+  charts[id]=new Chart(document.getElementById(id),{
+    type:'bar',
+    data:{labels,datasets:[{
+      data,
+      backgroundColor:labels.map((_,i)=>colors[i%colors.length]),
+      borderRadius:6,borderSkipped:false
+    }]},
+    options:{
+      indexAxis:'y',
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>`R$ ${ctx.parsed.x.toFixed(2).replace('.',',')} (${((ctx.parsed.x/total)*100).toFixed(0)}%)`}}
+      },
+      scales:{
+        x:{beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#6B6B80',font:{size:11},callback:v=>'R$'+v}},
+        y:{grid:{display:false},ticks:{color:'#A0A0B0',font:{size:12}}}
+      },
+      maintainAspectRatio:false
+    }
+  });
+}
+
 function desenhar(id,tipo,labels,data,label,cor,fill){
   if(charts[id]) charts[id].destroy();
   charts[id]=new Chart(document.getElementById(id),{
     type:tipo,
     data:{labels,datasets:[{label,data,backgroundColor:cor,borderColor:cor,borderRadius:4,fill:fill}]},
     options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#6B6B80',font:{size:11}}},x:{grid:{color:'rgba(255,255,255,.03)'},ticks:{color:'#6B6B80',font:{size:10}}}},maintainAspectRatio:false}
-  });
-}
-function desenharPie(id,labels,data){
-  if(charts[id]) charts[id].destroy();
-  const colors=['rgba(212,150,26,.85)','rgba(59,130,246,.85)','rgba(34,197,94,.85)','rgba(239,68,68,.85)','rgba(168,85,247,.85)'];
-  charts[id]=new Chart(document.getElementById(id),{
-    type:'doughnut',
-    data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0}]},
-    options:{plugins:{legend:{position:'bottom',labels:{color:'#6B6B80',font:{size:11},padding:12}}},maintainAspectRatio:false,cutout:'60%'}
   });
 }
 
@@ -621,7 +667,7 @@ async function addVenda(){
 
 // ---- EXCLUIR ----
 async function excluir(id){
-  if(!confirm('Excluir aste pedido?')) return;
+  if(!confirm('Excluir este pedido?')) return;
   const r=await chamar({acao:'excluir',id});
   if(r.status===200) carregar();
   else alert('Erro ao excluir.');
@@ -648,25 +694,30 @@ function exportarClientes(){
   baixarCSV(rows,'clientes-pao-caseiro-elane.csv');
 }
 function baixarCSV(rows,nome){
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const conteudo=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,"''")}`).join(',')).join('\n');
   const a=document.createElement('a');
-  a.href=URL,createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+  a.href=URL.createObjectURL(new Blob(['﻿'+conteudo],{type:'text/csv;charset=utf-8'}));
   a.download=nome; a.click();
 }
+function abrirModal(id){ document.getElementById(id).classList.add('open'); }
+function fecharModal(id){ document.getElementById(id).classList.remove('open'); }
 
-// ---- SENHA ----
 async function trocarSenha(){
-  const nova=prompt('Nova senha (minimo 6 caracteres):');
-  if(!nova||nova.trim().length<6){ alert('Senha muito curta.'); return; }
-  const conf=prompt('Confirme a nova senha:');
-  if(conf!==nova.trim()){ alert('Senhas nao conferem.'); return; }
+  const nova=prompt('Nova senha:'); if(!nova||!nova.trim()) return;
   const r=await chamar({acao:'trocar_senha',nova:nova.trim()});
-  if(r.status===200){ senha=nova.trim(); localStorage.setItem('painel_senha_elane',senha); alert('Senha alterada!'); }
+  if(r.status===200){ alert('Senha alterada!'); localStorage.setItem('painel_senha_elane',nova.trim()); senha=nova.trim(); }
   else alert('Erro ao trocar senha.');
 }
 
-// ---- MODAIS ----
-function abrirModal(id){ document.getElementById(id).classList.add('open'); if(id==='modalEsg') renderEsg(); }
+// ---- INIT ----
+if(senha){
+  document.getElementById('senha').value=senha;
+  entrar();
+}
+</script>
+</body>
+</html>
+f(id==='modalEsg') renderEsg(); }
 function fecharModal(id){ document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
 
