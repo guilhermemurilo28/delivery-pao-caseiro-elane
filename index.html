@@ -247,6 +247,12 @@ body{background:var(--bg);color:var(--text)}
           <input type="text" id="referencia" placeholder="Proximo a...">
         </div>
       </div>
+      <div style="margin-bottom:12px">
+        <button type="button" id="btnLocalizacao" onclick="usarLocalizacao()" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px dashed var(--gold);background:transparent;color:var(--marrom2);font-weight:700;font-size:.84rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s">
+          <span>&#127757;</span> <span id="btnLocTxt">Usar minha localizacao atual</span>
+        </button>
+        <input type="hidden" id="localizacaoLink">
+      </div>
     </div>
 
     <!-- DADOS CLIENTE -->
@@ -315,7 +321,7 @@ body{background:var(--bg);color:var(--text)}
 <script>
 // ===== CONFIG =====
 const SUPABASE_URL  = "https://fjlmdqxnxcitzfkumbow.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqbG1kcXhueGNpdHpma3VtYm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDY5NjYsImV4cCI6MjA5ODA4Mjk2Nn0.9B4kn9KUvDZzF9XVhFrd4JLMyBv2K2UIAXUrsWqfDFI";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqbG1kcXnueGNpdHpma3VtYm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDY5NjYsImV4cCI6MjA5ODA4Mjk2Nn0.9B4kn9KUvDZzF9XVhFrd4JLMyBv2K2UIAXUrsWqfDFI";
 const WHATSAPP      = "5588996073668";
 const PIX           = "d5f22d0d-b130-4615-91b6-7e887bcf2956";
 const MP_PUBLIC_KEY = "COLE_SUA_PUBLIC_KEY_MERCADO_PAGO_AQUI";
@@ -611,6 +617,31 @@ function setPg(pg,btn){
   document.getElementById('mpBox').style.display=pg==='Cartao Online'?'block':'none';
   document.getElementById('trocoBox').style.display=pg==='Dinheiro'?'block':'none';
 }
+function usarLocalizacao(){
+  const btn = document.getElementById('btnLocalizacao');
+  const txt = document.getElementById('btnLocTxt');
+  if(!navigator.geolocation){ txt.textContent='GPS nao disponivel neste dispositivo'; return; }
+  txt.textContent='Buscando localizacao...';
+  btn.style.opacity='0.6';
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const {latitude:lat,longitude:lng} = pos.coords;
+      const link = `https://maps.google.com/?q=${lat},${lng}`;
+      document.getElementById('localizacaoLink').value = link;
+      btn.style.background='rgba(34,197,94,.1)';
+      btn.style.borderColor='rgba(34,197,94,.6)';
+      btn.style.color='#15803D';
+      btn.style.opacity='1';
+      txt.textContent='Localizacao capturada!';
+    },
+    err=>{
+      btn.style.opacity='1';
+      txt.textContent = err.code===1 ? 'Permissao negada. Tente digitar o endereco.' : 'Nao foi possivel obter localizacao.';
+    },
+    {timeout:10000,enableHighAccuracy:true}
+  );
+}
+
 function copiarPix(){
   navigator.clipboard.writeText(PIX).then(()=>{
     const el=document.querySelector('.pix-copy');
@@ -627,6 +658,7 @@ async function confirmarPedido(){
   const end=tipoEntrega==='entrega'?document.getElementById('endereco').value.trim():'';
   const ref=tipoEntrega==='entrega'?document.getElementById('referencia').value.trim():'';
   const obs=document.getElementById('obsCliente').value.trim();
+  const locLink=document.getElementById('localizacaoLink').value.trim();
   if(!nome){ err.textContent='Informe seu nome.'; return; }
   if(!fone){ err.textContent='Informe seu WhatsApp.'; return; }
   if(tipoEntrega==='entrega'&&!bairro){ err.textContent='Selecione o bairro.'; return; }
@@ -642,7 +674,7 @@ async function confirmarPedido(){
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${SUPABASE_ANON}`,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({cliente:nome,telefone:fone,tipo:tipoEntrega,bairro:bairro||null,
         itens:carrinho.map(i=>({nome:i.nome,qtd:i.qtd,preco:i.preco})),
-        total,taxa_entrega:taxa,pagamento:pgSel,obs:obs||null,endereco:end||null,referencia:ref||null,origem:'cardapio'})
+        total,taxa_entrega:taxa,pagamento:pgSel,obs:obs||null,endereco:end||null,referencia:ref||null,localizacao:locLink||null,origem:'cardapio'})
     });
   }catch(e){}
 
@@ -657,6 +689,7 @@ async function confirmarPedido(){
     msg+=`*Bairro:* ${bairro}%0A`;
     if(end) msg+=`*Endereco:* ${end}%0A`;
     if(ref) msg+=`*Referencia:* ${ref}%0A`;
+    if(locLink) msg+=`*Localizacao:* ${locLink}%0A`;
   } else { msg+=`*Retirada no local*%0A`; }
   msg+=`*Total:* R$ ${total.toFixed(2).replace('.',',')}%0A`;
   msg+=`*Pagamento:* ${pgSel}%0A`;
