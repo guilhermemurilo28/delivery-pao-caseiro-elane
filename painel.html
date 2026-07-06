@@ -71,7 +71,8 @@
     <h1>🍞 Painel de Vendas <small>Pão Caseiro da Elane — Canoa Quebrada / Aracati-CE</small></h1>
     <div>
       <button class="btn" onclick="abrirModal('modalPedido')">➕ Novo pedido</button>
-      <button class="btn" onclick="abrirModal('modalEsg')">🚫 Esgotados</button>
+      <button class="btn" onclick="abrirModal('modalEsg')">🍽️ Cardápio</button>
+      <button class="btn" onclick="abrirModal('modalCup')">🎟️ Cupons</button>
       <button class="btn btn-sec" onclick="carregar()">🔄 Atualizar</button>
       <button class="btn btn-sec" onclick="exportarCSV()">⬇️ CSV vendas</button>
       <button class="btn btn-sec" onclick="exportarClientes()">📇 Clientes</button>
@@ -93,6 +94,10 @@
       <input type="date" id="dtIni" style="width:auto;margin:0" onchange="setPersonalizado()">
       <span style="font-size:.8rem">até</span>
       <input type="date" id="dtFim" style="width:auto;margin:0" onchange="setPersonalizado()">
+      <span style="width:12px"></span>
+      <span class="chip ativo" data-s="ativos" onclick="setStatusF(this)">Pedidos</span>
+      <span class="chip" data-s="abandonados" onclick="setStatusF(this)">🛒 Abandonados</span>
+      <span class="chip" data-s="todos" onclick="setStatusF(this)">Todos</span>
     </div>
 
     <div class="cards">
@@ -129,14 +134,31 @@
       <div class="erro" id="mErro"></div>
     </div></div>
 
-    <!-- Modal: Itens esgotados -->
+    <!-- Modal: Cardápio (preços, esgotados, ativos) -->
     <div class="pmodal" id="modalEsg"><div class="pmodal-card">
       <button class="pmodal-x" onclick="fecharModal('modalEsg')">&times;</button>
-      <h3 style="color:var(--roxo);margin-bottom:6px">🚫 Itens esgotados</h3>
-      <p style="font-size:.8rem;color:#777;margin-bottom:12px">Marque o que acabou — no cardápio aparece riscado e o cliente não consegue escolher. Desmarque quando voltar a ter.</p>
-      <div id="esgList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px;max-height:50vh;overflow:auto;border:1px solid #eee;border-radius:8px;padding:10px"></div>
-      <button class="btn btn-roxo" style="margin-top:12px" onclick="salvarEsgotados()">Salvar esgotados</button>
-      <span id="esgMsg" style="margin-left:10px;font-size:.85rem"></span>
+      <h3 style="color:var(--roxo);margin-bottom:6px">🍽️ Cardápio</h3>
+      <p style="font-size:.8rem;color:#777;margin-bottom:12px">Edite preço, marque <b>esgotado</b> (aparece riscado no site) ou desmarque <b>ativo</b> (some do site). As mudanças salvam sozinhas.</p>
+      <div id="esgList" style="max-height:55vh;overflow:auto;border:1px solid #eee;border-radius:8px;padding:10px"></div>
+      <span id="esgMsg" style="font-size:.85rem"></span>
+    </div></div>
+
+    <!-- Modal: Cupons -->
+    <div class="pmodal" id="modalCup"><div class="pmodal-card">
+      <button class="pmodal-x" onclick="fecharModal('modalCup')">&times;</button>
+      <h3 style="color:var(--roxo);margin-bottom:6px">🎟️ Cupons de desconto</h3>
+      <p style="font-size:.8rem;color:#777;margin-bottom:12px">O cliente digita o código no checkout. Desconto em R$ ou %, com pedido mínimo, validade e limite de usos.</p>
+      <div class="row-form" style="margin-bottom:10px">
+        <div><label>Código</label><input type="text" id="cupCod" placeholder="BEMVINDO10" style="text-transform:uppercase"></div>
+        <div><label>Tipo</label><select id="cupTipo"><option value="valor">R$ fixo</option><option value="pct">% do subtotal</option></select></div>
+        <div><label>Valor</label><input type="number" step="0.01" id="cupValor" placeholder="10"></div>
+        <div><label>Pedido mínimo (R$)</label><input type="number" step="0.01" id="cupMin" placeholder="0"></div>
+        <div><label>Validade</label><input type="date" id="cupVal"></div>
+        <div><label>Limite de usos</label><input type="number" id="cupLim" placeholder="ilimitado"></div>
+        <div><button class="btn btn-roxo" onclick="cupomSalvar()">Salvar cupom</button></div>
+      </div>
+      <div id="cupMsg" style="font-size:.85rem;margin-bottom:8px"></div>
+      <div id="cupList" style="max-height:38vh;overflow:auto;border:1px solid #eee;border-radius:8px;padding:10px"></div>
     </div></div>
 
     <div class="box">
@@ -159,38 +181,72 @@ const SUPABASE_URL = "https://fjlmdqxnxcitzfkumbow.supabase.co";
 const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqbG1kcXhueGNpdHpma3VtYm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDY5NjYsImV4cCI6MjA5ODA4Mjk2Nn0.9B4kn9KUvDZzF9XVhFrd4JLMyBv2K2UIAXUrsWqfDFI";
 const FN = `${SUPABASE_URL}/functions/v1/painel`;
 
-/* Itens do cardápio — mantenha em sincronia com o index.html */
-const ADICIONAIS = [];
-const COBERTURAS = [];
-const CREMES = [];
-const ITENS_MENU = ["Proteína","Frango Molho Limão","Frango Xadrez","Strogonoff de Frango","Frango Curry","Filé de Peixe no Alecrim","Lasanha de Carne","Lasanha de Frango","Empadão de Frango","Empadão de Camarão","Filé à Parmegiana","Filé de Peixe ao Molho de Coco","Creme de Camarão","Creme de Galinha","Yakisoba de Frango","Yakisoba de Camarão","Yakisoba de Carne","Yakisoba Misto","Espaguete à Bolonhesa","Espaguete de Camarão","Espaguete de Frango ao Molho Branco","Espaguete Cheddar com Bacon","Espaguete de Brócolis ao Molho Branco","Espaguete Carbonara","Rigatoni de Camarão","Rigatoni de Filé","Pastel Carne Azeitona Milho Catupiry","Pastel Frango Catupiry e Queijo","Pastel Camarão Catupiry e Queijo","Pastel Bacon Cheddar e Frango","Hambúrguer","X-Bacon","X-Calabresa","X-Frango","X-Pão Caseiro da Elane"];
-let esgotadosSel = [];
-function todosItens(){ return [...new Set([...ADICIONAIS,...COBERTURAS,...CREMES,...ITENS_MENU])].sort((a,b)=>a.localeCompare(b,'pt')); }
+/* v2: Cardápio gerenciado direto no banco (preço, esgotado, ativo) */
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+let cardapioCache={categorias:[],produtos:[]};
 async function carregarEsgotados(){
-  try{
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/config?select=esgotados&id=eq.1`,{headers:{"apikey":ANON,"Authorization":`Bearer ${ANON}`}});
-    const d=await r.json(); esgotadosSel=(d&&d[0]&&Array.isArray(d[0].esgotados))?d[0].esgotados:[];
-  }catch(e){ esgotadosSel=[]; }
+  const r=await chamar({acao:'cardapio'});
+  if(r.status===200){ cardapioCache=await r.json(); }
   renderEsg();
 }
 function renderEsg(){
-  const set=esgotadosSel.map(x=>String(x).toLowerCase());
-  document.getElementById('esgList').innerHTML=todosItens().map(n=>{
-    const ck=set.includes(n.toLowerCase())?'checked':'';
-    return `<label style="display:flex;gap:6px;align-items:center;font-size:.85rem;padding:3px"><input type="checkbox" value="${n}" ${ck}>${n}</label>`;
+  const el=document.getElementById('esgList'); if(!el) return;
+  el.innerHTML=(cardapioCache.produtos||[]).map(p=>{
+    const cat=(cardapioCache.categorias||[]).find(c=>c.id===p.categoria_id);
+    const precoIn = (p.preco!=null && !(Array.isArray(p.tamanhos)&&p.tamanhos.length))
+      ? `<input type="number" step="0.01" value="${Number(p.preco)}" style="width:78px;margin:0;padding:5px" onchange="prodCampo(${p.id},'preco',this.value)">`
+      : `<span style="color:#999;font-size:.72rem">por tamanho</span>`;
+    return `<div style="display:flex;gap:8px;align-items:center;font-size:.85rem;padding:4px;border-bottom:1px solid #f0e6d8">
+      <label style="flex:1;display:flex;gap:6px;align-items:center;margin:0">
+        <input type="checkbox" style="width:15px;height:15px;margin:0" ${p.esgotado?'checked':''} onchange="prodCampo(${p.id},'esgotado',this.checked)">
+        <span>${esc(p.nome)} <small style="color:#999">${esc(cat?cat.nome:'')}</small></span>
+      </label>${precoIn}
+      <label style="font-size:.72rem;color:#777;margin:0"><input type="checkbox" style="width:13px;height:13px;margin:0" ${p.ativo?'checked':''} onchange="prodCampo(${p.id},'ativo',this.checked)"> ativo</label>
+    </div>`;
   }).join('');
 }
-async function salvarEsgotados(){
-  const lista=[...document.querySelectorAll('#esgList input:checked')].map(i=>i.value);
+async function prodCampo(id,campo,valor){
+  const p=(cardapioCache.produtos||[]).find(x=>x.id===id); if(!p) return;
+  p[campo] = campo==='preco' ? Number(valor) : valor;
   const m=document.getElementById('esgMsg'); m.style.color='#777'; m.textContent='Salvando...';
-  const r=await chamar({acao:"set_esgotados", lista});
-  if(r.status===200){ esgotadosSel=lista; m.style.color='#1a7d3c'; m.textContent='Salvo! O cardápio já reflete.'; setTimeout(()=>m.textContent='',3000); }
+  const r=await chamar({acao:'produto_save', produto:p});
+  if(r.status===200){ m.style.color='#1a7d3c'; m.textContent='Salvo! O cardápio já reflete.'; setTimeout(()=>m.textContent='',2000); }
   else { m.style.color='#c0392b'; m.textContent='Erro ao salvar.'; }
 }
 
-let senha = localStorage.getItem('painel_senha_elane') || "";
+/* v2: Cupons */
+async function carregarCupons(){
+  const r=await chamar({acao:'cupons'});
+  const d=r.status===200?await r.json():{cupons:[]};
+  const el=document.getElementById('cupList'); if(!el) return;
+  el.innerHTML=(d.cupons||[]).map(c=>`<div style="display:flex;gap:8px;align-items:center;font-size:.85rem;padding:5px;border-bottom:1px solid #f0e6d8">
+    <strong style="flex:1">${esc(c.codigo)}</strong>
+    <span>${c.tipo==='pct'?Number(c.valor)+'%':'R$ '+Number(c.valor).toFixed(2)}</span>
+    <span style="color:#999">mín R$ ${Number(c.minimo).toFixed(2)}</span>
+    <span style="color:#999">${c.usados||0}${c.limite_uso?'/'+c.limite_uso:''} usos</span>
+    <span>${c.ativo?'🟢':'🔴'}</span>
+    <button class="del" onclick="cupomDel('${esc(c.codigo)}')">excluir</button>
+  </div>`).join('') || '<div class="muted">Nenhum cupom ainda.</div>';
+}
+async function cupomSalvar(){
+  const g=id=>document.getElementById(id).value.trim();
+  const m=document.getElementById('cupMsg');
+  if(!g('cupCod')||!g('cupValor')){ m.style.color='#c0392b'; m.textContent='Informe código e valor.'; return; }
+  const r=await chamar({acao:'cupom_save', cupom:{codigo:g('cupCod'), tipo:g('cupTipo'), valor:g('cupValor'),
+    minimo:g('cupMin')||0, validade:g('cupVal')||null, limite_uso:g('cupLim')||null}});
+  if(r.status===200){ m.style.color='#1a7d3c'; m.textContent='Cupom salvo!'; ['cupCod','cupValor','cupMin','cupVal','cupLim'].forEach(i=>document.getElementById(i).value=''); carregarCupons(); }
+  else { m.style.color='#c0392b'; m.textContent='Erro ao salvar.'; }
+}
+async function cupomDel(cod){
+  if(!confirm('Excluir o cupom '+cod+'?')) return;
+  await chamar({acao:'cupom_del', codigo:cod}); carregarCupons();
+}
+
+let token = localStorage.getItem('painel_token_elane') || "";
 let pedidos = [];
+let clientesBase = [];
 let periodo = "hoje";
+let statusF = "ativos";   // ativos | abandonados | todos
 let charts = {};
 
 function brl(v){return 'R$ '+(Number(v)||0).toFixed(2).replace('.',',')}
@@ -199,33 +255,48 @@ async function chamar(payload){
   const r = await fetch(FN,{
     method:"POST",
     headers:{"apikey":ANON,"Authorization":`Bearer ${ANON}`,"Content-Type":"application/json"},
-    body:JSON.stringify({senha, ...payload})
+    body:JSON.stringify({token, ...payload})
   });
   return r;
 }
 
 async function entrar(){
   const inp = document.getElementById('senha').value;
-  if(inp) senha = inp;          // botão: usa o que foi digitado; auto-login: mantém o salvo
   const er = document.getElementById('loginErro');
   er.textContent = "Verificando...";
-  const r = await chamar({acao:"listar"});
-  if(r.status===200){
-    localStorage.setItem('painel_senha_elane', senha);
+  if(inp){ // login com senha -> recebe token de sessão (12h)
+    const r = await chamar({acao:"login", senha:inp});
+    const d = await r.json().catch(()=>({}));
+    if(r.status!==200){ er.textContent=d.error||"Senha incorreta."; return; }
+    token = d.token; localStorage.setItem('painel_token_elane', token);
+  }
+  if(!token){ er.textContent="Digite a senha."; return; }
+  const r2 = await chamar({acao:"listar"});
+  if(r2.status===200){
     document.getElementById('login').style.display='none';
     document.getElementById('app').style.display='block';
-    const d = await r.json(); pedidos = d.pedidos||[];
+    const d = await r2.json(); pedidos = d.pedidos||[]; clientesBase = d.clientes||[];
     setDefaultManualDate(); render(); carregarStatus(); carregarEsgotados();
-  } else if(r.status===401){ er.textContent="Senha incorreta."; }
-  else { er.textContent="Erro ao conectar. Tente de novo."; }
+  } else {
+    localStorage.removeItem('painel_token_elane'); token="";
+    er.textContent="Sessão expirada. Digite a senha.";
+  }
 }
 
-function sair(){ localStorage.removeItem('painel_senha_elane'); location.reload(); }
+function sair(){ localStorage.removeItem('painel_token_elane'); location.reload(); }
 
 async function carregar(){
   const r = await chamar({acao:"listar"});
-  if(r.status===200){ const d=await r.json(); pedidos=d.pedidos||[]; render(); }
+  if(r.status===200){ const d=await r.json(); pedidos=d.pedidos||[]; clientesBase=d.clientes||[]; render(); }
   else if(r.status===401){ sair(); }
+}
+function setStatusF(el){
+  document.querySelectorAll('.chip[data-s]').forEach(c=>c.classList.remove('ativo'));
+  el.classList.add('ativo'); statusF=el.dataset.s; render();
+}
+async function mudarStatus(id,st){
+  const r=await chamar({acao:'set_status', id, status:st});
+  if(r.status===200) carregar(); else alert('Erro ao mudar o status.');
 }
 
 function setPeriodo(el){
@@ -252,7 +323,13 @@ function filtrar(){
     ini=inicioDia(document.getElementById('dtIni').value+"T00:00:00");
     fim=new Date(document.getElementById('dtFim').value+"T23:59:59");
   }
-  return pedidos.filter(p=>{ const t=new Date(p.created_at); return t>=ini && t<=fim; });
+  return pedidos.filter(p=>{
+    const t=new Date(p.created_at);
+    if(t<ini || t>fim) return false;
+    if(statusF==='ativos') return p.status!=='abandonado';
+    if(statusF==='abandonados') return p.status==='abandonado';
+    return true;
+  });
 }
 
 function render(){
@@ -290,15 +367,26 @@ function render(){
 
   // tabela
   document.getElementById('tblCount').textContent=f.length;
+  const STATUS=['recebido','preparo','entrega','concluido','cancelado'];
   document.getElementById('tblBody').innerHTML = f.length ? f.map(p=>{
     const dt=new Date(p.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-    const itens=(p.itens||[]).map(i=>`${i.qtd}x ${i.nome}`).join(', ')||(p.obs||'—');
+    const itens=esc((p.itens||[]).map(i=>`${i.qtd}x ${i.nome}`).join(', ')||(p.obs||'—'));
     const bcls=p.origem==='manual'?'b-manual':'b-card';
+    let stCell;
+    if(p.status==='abandonado'){
+      const tel=String(p.telefone||'').replace(/\D/g,'');
+      const link=tel?`https://wa.me/${tel.length<=11?'55'+tel:tel}?text=${encodeURIComponent('Oi '+(p.cliente||'')+'! Vi que você montou um pedido de '+brl(p.total)+' no nosso cardápio e não finalizou. Posso te ajudar? 😊')}`:'';
+      stCell=`<span class="badge" style="background:#fdecea;color:#c0392b">abandonado</span>`+(link?` <a href="${link}" target="_blank" style="font-size:.75rem">📲 chamar</a>`:'');
+    } else {
+      stCell=`<select style="width:auto;margin:0;padding:4px 6px;font-size:.78rem" onchange="mudarStatus('${p.id}',this.value)">`+
+        STATUS.map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s}</option>`).join('')+`</select>`;
+    }
     return `<tr>
-      <td>${dt}</td><td>${p.cliente||'—'}</td><td>${p.telefone||'—'}</td><td>${p.bairro||'—'}</td>
-      <td style="max-width:220px">${itens}</td>
-      <td><strong>${brl(p.total)}</strong></td><td>${p.pagamento||'—'}</td>
-      <td><span class="badge ${bcls}">${p.origem==='manual'?'manual':'site'}</span></td>
+      <td>${dt}</td><td>${esc(p.cliente)||'—'}</td><td>${esc(p.telefone)||'—'}</td><td>${esc(p.bairro)||'—'}</td>
+      <td style="max-width:200px">${itens}</td>
+      <td><strong>${brl(p.total)}</strong>${p.desconto>0?`<div style="font-size:.7rem;color:#1a7d3c">−${brl(p.desconto)}${p.cupom?' ('+esc(p.cupom)+')':''}</div>`:''}</td>
+      <td>${esc(p.pagamento)||'—'}</td>
+      <td>${stCell}<div style="margin-top:3px"><span class="badge ${bcls}">${p.origem==='manual'?'manual':'site'}</span></div></td>
       <td><button class="del" onclick="excluir('${p.id}')">excluir</button></td>
     </tr>`;
   }).join('') : '<tr><td colspan="9" class="muted">Nenhum pedido no período.</td></tr>';
@@ -326,7 +414,7 @@ function setDefaultManualDate(){
   document.getElementById('mData').value=n.toISOString().slice(0,16);
 }
 
-function abrirModal(id){ document.getElementById(id).classList.add('aberto'); if(id==='modalEsg') renderEsg(); }
+function abrirModal(id){ document.getElementById(id).classList.add('aberto'); if(id==='modalEsg') renderEsg(); if(id==='modalCup') carregarCupons(); }
 function fecharModal(id){ document.getElementById(id).classList.remove('aberto'); }
 
 async function addVenda(){
@@ -384,26 +472,22 @@ function exportarCSV(){
 }
 
 async function trocarSenha(){
-  const nova=prompt("Digite a NOVA senha do painel (mínimo 6 caracteres):");
+  const atual=prompt("Senha ATUAL do painel:");
+  if(atual===null) return;
+  const nova=prompt("NOVA senha (mínimo 8 caracteres):");
   if(nova===null) return;
-  if(nova.trim().length<6){ alert("Senha muito curta (mínimo 6 caracteres)."); return; }
+  if(nova.trim().length<8){ alert("Senha muito curta (mínimo 8 caracteres)."); return; }
   const conf=prompt("Confirme a nova senha:");
-  if(conf===null) return;
-  if(conf.trim()!==nova.trim()){ alert("As senhas não conferem."); return; }
-  const r=await chamar({acao:"trocar_senha", nova:nova.trim()});
-  if(r.status===200){
-    senha=nova.trim(); localStorage.setItem('painel_senha_elane',senha);
-    alert("Senha alterada com sucesso! Use a nova senha no próximo acesso.");
-  } else {
-    let m="Erro ao trocar a senha."; try{const d=await r.json(); if(d.error)m=d.error;}catch(e){}
-    alert(m);
-  }
+  if(conf===null || conf.trim()!==nova.trim()){ alert("As senhas não conferem."); return; }
+  const r=await chamar({acao:"trocar_senha", atual:atual.trim(), nova:nova.trim()});
+  if(r.status===200){ alert("Senha alterada com sucesso!"); }
+  else { let m="Erro ao trocar a senha."; try{const d=await r.json(); if(d.error)m=d.error;}catch(e){} alert(m); }
 }
 
 let lojaAberta=true;
 async function carregarStatus(){
   try{
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/config?select=loja_aberta&id=eq.1`,{headers:{"apikey":ANON,"Authorization":`Bearer ${ANON}`}});
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/config_publica?select=loja_aberta`,{headers:{"apikey":ANON,"Authorization":`Bearer ${ANON}`}});
     const d=await r.json(); lojaAberta=(d&&d[0])?d[0].loja_aberta:true;
   }catch(e){}
   pintarStatus();
@@ -422,8 +506,8 @@ async function toggleLoja(){
   else alert('Erro ao alterar o status da loja.');
 }
 
-/* auto-login se já tiver senha salva */
-if(senha){ entrar(); }
+/* auto-login se já tiver sessão válida salva */
+if(token){ entrar(); }
 </script>
 </body>
 </html>

@@ -194,6 +194,12 @@
         <button type="button" class="btn-copiar" onclick="copiarPix()">📋 Copiar chave Pix</button>
         <p class="pix-info">Faça o Pix do valor total e <strong>envie o comprovante aqui no WhatsApp</strong> para confirmarmos seu pedido.</p>
       </div>
+      <label>Cupom de desconto (opcional)</label>
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <input type="text" id="cliCupom" placeholder="Ex.: BEMVINDO10" style="text-transform:uppercase;flex:1">
+        <button type="button" class="btn-copiar" style="margin-top:5px" onclick="aplicarCupom()">Aplicar</button>
+      </div>
+      <div id="cupomStatus" class="local-status"></div>
       <label>Observações (opcional)</label>
       <textarea id="cliObs" rows="2" placeholder="Ex.: pastel sem cebola, troco para R$50..."></textarea>
       <div id="resumoTotais" class="resumo-tot"></div>
@@ -211,129 +217,63 @@
 const WHATSAPP = "5588996073668"; // Pão Caseiro da Elane
 const PIX = "d5f22d0d-b130-4615-91b6-7e887bcf2956"; // Chave Pix aleatória
 
-/* Supabase — registro dos pedidos (a chave anon é pública por design) */
+/* Supabase — v2: pedidos validados no SERVIDOR via Edge Function */
 const SUPABASE_URL = "https://fjlmdqxnxcitzfkumbow.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqbG1kcXhueGNpdHpma3VtYm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDY5NjYsImV4cCI6MjA5ODA4Mjk2Nn0.9B4kn9KUvDZzF9XVhFrd4JLMyBv2K2UIAXUrsWqfDFI";
-function gravarPedido(dados){
-  try{
-    fetch(`${SUPABASE_URL}/rest/v1/pedidos`,{
-      method:"POST",
-      headers:{"apikey":SUPABASE_ANON,"Authorization":`Bearer ${SUPABASE_ANON}`,"Content-Type":"application/json","Prefer":"return=minimal"},
-      body:JSON.stringify(dados)
-    });
-  }catch(e){/* nunca bloqueia o envio do pedido */}
+const H_ANON = {"apikey":SUPABASE_ANON,"Authorization":`Bearer ${SUPABASE_ANON}`};
+async function api(payload){
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/pedido`,{
+    method:"POST", headers:{...H_ANON,"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error||"Erro de conexão. Tente de novo.");
+  return d;
 }
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 /* Status Aberto/Fechado (controlado no painel) */
 let LOJA_ABERTA = true;
 async function carregarConfig(){
   try{
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/config?select=loja_aberta,esgotados&id=eq.1`,{headers:{"apikey":SUPABASE_ANON,"Authorization":`Bearer ${SUPABASE_ANON}`}});
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/config_publica?select=*`,{headers:H_ANON});
     const d=await r.json();
-    if(d && d[0]){
-      LOJA_ABERTA = d[0].loja_aberta;
-      ESGOTADOS = Array.isArray(d[0].esgotados) ? d[0].esgotados : [];
-    }
-  }catch(e){ LOJA_ABERTA = true; ESGOTADOS = []; }
+    if(d && d[0]) LOJA_ABERTA = d[0].loja_aberta;
+  }catch(e){ LOJA_ABERTA = true; }
   const b=document.getElementById('statusLoja');
   if(b){
     if(LOJA_ABERTA){ b.textContent='● Aberto agora'; b.style.background='var(--verde)'; }
     else { b.textContent='● Fechado no momento'; b.style.background='#c0392b'; }
   }
-  montarMenu();   // re-renderiza o cardápio aplicando os esgotados do banco
 }
 
-/* ITENS ESGOTADOS — gerenciados pelo PAINEL (não precisa mexer aqui).
-   A lista é carregada do banco em carregarConfig(). */
-let ESGOTADOS = [];
-function esgotado(nome){
-  return ESGOTADOS.map(x=>x.toLowerCase().trim()).includes((nome||"").toLowerCase().trim());
-}
-
-/* ==== DADOS DO CARDÁPIO ==== */
+/* ==== CARDÁPIO — carregado do banco (editável pelo painel) ==== */
 const ADICIONAIS = [];
 const COBERTURAS = [];
 const CREMES = [];
+let MENU = {};
 
-const MENU = {
-  "🍱 Marmitas": {
-    sub:"Feijão, arroz, farofa, salada, macarrão e a proteína à sua escolha — 500ml ou 750ml",
-    itens:[
-      {nome:"Proteína",desc:"Marmita completa com proteína à escolha",tamanhos:[{nome:"500ml",preco:15.00},{nome:"750ml",preco:18.00}]},
-      {nome:"Frango Molho Limão",desc:"Frango suculento ao molho de limão siciliano com ervas",tamanhos:[{nome:"500ml",preco:15.00},{nome:"750ml",preco:18.00}]},
-      {nome:"Frango Xadrez",desc:"Frango ao estilo xadrez com legumes e molho agridoce",tamanhos:[{nome:"500ml",preco:15.00},{nome:"750ml",preco:18.00}]},
-      {nome:"Strogonoff de Frango",desc:"Cremoso strogonoff de frango com batata palha",tamanhos:[{nome:"500ml",preco:15.00},{nome:"750ml",preco:18.00}]},
-      {nome:"Frango Curry",desc:"Frango ao curry com leite de coco e especiarias",tamanhos:[{nome:"500ml",preco:15.00},{nome:"750ml",preco:18.00}]},
-      {nome:"Filé de Peixe no Alecrim",desc:"Filé de peixe grelhado com alecrim e azeite",tamanhos:[{nome:"500ml",preco:15.00},{nome:"750ml",preco:18.00}]},
-    ]
-  },
-  "🍝 Lasanhas": {
-    itens:[
-      {nome:"Lasanha de Carne",desc:"Lasanha tradicional à bolonhesa com queijo gratinado",tamanhos:[{nome:"500ml",preco:20.00},{nome:"750ml",preco:24.00}]},
-      {nome:"Lasanha de Frango",desc:"Lasanha cremosa de frango com catupiry e queijo",tamanhos:[{nome:"500ml",preco:20.00},{nome:"750ml",preco:24.00}]},
-    ]
-  },
-  "🥧 Empadão": {
-    itens:[
-      {nome:"Empadão de Frango",preco:40.00,desc:"Empadão caseiro recheado de frango desfiado com catupiry"},
-      {nome:"Empadão de Camarão",preco:50.00,desc:"Empadão especial recheado de camarão ao molho de tomate"},
-    ]
-  },
-  "⭐ Pratos Especiais": {
-    itens:[
-      {nome:"Filé à Parmegiana",preco:28.00,desc:"Filé empanado com molho de tomate e queijo gratinado"},
-      {nome:"Filé de Peixe ao Molho de Coco",preco:30.00,desc:"Filé de peixe cremoso com molho de coco e gengibre"},
-    ]
-  },
-  "🍲 Cremes": {
-    itens:[
-      {nome:"Creme de Camarão",preco:22.00,desc:"Creme espesso de camarão com requeijão e temperos frescos"},
-      {nome:"Creme de Galinha",preco:18.00,desc:"Creme encorpado de galinha caipira com legumes"},
-    ]
-  },
-  "🍜 Yakisoba": {
-    itens:[
-      {nome:"Yakisoba de Frango",desc:"Macarrão oriental com frango, legumes e molho shoyu",tamanhos:[{nome:"500ml",preco:20.00},{nome:"750ml",preco:25.00}]},
-      {nome:"Yakisoba de Camarão",desc:"Macarrão oriental com camarão e legumes frescos",tamanhos:[{nome:"500ml",preco:24.00},{nome:"750ml",preco:29.00}]},
-      {nome:"Yakisoba de Carne",desc:"Macarrão oriental com carne macia e legumes ao shoyu",tamanhos:[{nome:"500ml",preco:22.00},{nome:"750ml",preco:27.00}]},
-      {nome:"Yakisoba Misto",desc:"Combinação de frango, carne e camarão com legumes",tamanhos:[{nome:"500ml",preco:26.00},{nome:"750ml",preco:32.00}]},
-    ]
-  },
-  "🍝 Espaguetes": {
-    itens:[
-      {nome:"Espaguete à Bolonhesa",desc:"Molho bolonhesa tradicional com carne moída e ervas",tamanhos:[{nome:"500ml",preco:18.00},{nome:"750ml",preco:22.00}]},
-      {nome:"Espaguete de Camarão",desc:"Espaguete ao alho e óleo com camarão grelhado",tamanhos:[{nome:"500ml",preco:25.00},{nome:"750ml",preco:30.00}]},
-      {nome:"Espaguete de Frango ao Molho Branco",desc:"Espaguete ao molho branco com frango desfiado",tamanhos:[{nome:"500ml",preco:20.00},{nome:"750ml",preco:24.00}]},
-      {nome:"Espaguete Cheddar com Bacon",desc:"Espaguete cremoso de cheddar com bacon crocante",tamanhos:[{nome:"500ml",preco:22.00},{nome:"750ml",preco:26.00}]},
-      {nome:"Espaguete de Brócolis ao Molho Branco",desc:"Espaguete vegetariano com brócolis e molho bechamel",tamanhos:[{nome:"500ml",preco:18.00},{nome:"750ml",preco:22.00}]},
-      {nome:"Espaguete Carbonara",desc:"Carbonara clássica com ovos, queijo, pancetta e pimenta",tamanhos:[{nome:"500ml",preco:22.00},{nome:"750ml",preco:26.00}]},
-      {nome:"Rigatoni de Camarão",desc:"Rigatoni ao molho cremoso de camarão com tomate seco",tamanhos:[{nome:"500ml",preco:26.00},{nome:"750ml",preco:31.00}]},
-      {nome:"Rigatoni de Filé",desc:"Rigatoni com filé de carne ao molho de vinho tinto",tamanhos:[{nome:"500ml",preco:26.00},{nome:"750ml",preco:31.00}]},
-    ]
-  },
-  "🥟 Pastéis": {
-    itens:[
-      {nome:"Pastel Carne Azeitona Milho Catupiry",preco:8.00,desc:"Pastel crocante de carne moída, azeitona, milho e catupiry"},
-      {nome:"Pastel Frango Catupiry e Queijo",preco:8.00,desc:"Pastel crocante de frango desfiado com catupiry e queijo"},
-      {nome:"Pastel Camarão Catupiry e Queijo",preco:10.00,desc:"Pastel especial de camarão com catupiry e queijo derretido"},
-      {nome:"Pastel Bacon Cheddar e Frango",preco:10.00,desc:"Pastel duplo de bacon crocante, cheddar e frango"},
-    ]
-  },
-  "🍔 Sanduíches": {
-    sub:"No pão caseiro da casa",
-    itens:[
-      {nome:"Hambúrguer",preco:12.00,desc:"Hambúrguer artesanal 150g, queijo, alface e tomate no pão caseiro"},
-      {nome:"X-Bacon",preco:14.00,desc:"Hambúrguer com queijo, bacon crocante e maionese da casa"},
-      {nome:"X-Calabresa",preco:13.00,desc:"Hambúrguer com calabresa grelhada, queijo e cebola caramelizada"},
-      {nome:"X-Frango",preco:12.00,desc:"Frango grelhado, queijo, alface, tomate e molho especial"},
-      {nome:"X-Pão Caseiro da Elane",preco:16.00,desc:"Especial da casa: pão caseiro artesanal com recheio surpresa do dia"},
-    ]
-  },
-  "🍞 Pães por Encomenda": {
-    sub:"Nosso cardápio de pães artesanais está sendo preparado — fale no WhatsApp para encomendas!",
-    itens:[]
-  },
-};
+async function carregarCardapio(){
+  try{
+    const [rc,rp]=await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/categorias?select=*&ativa=eq.true&order=ordem`,{headers:H_ANON}),
+      fetch(`${SUPABASE_URL}/rest/v1/produtos?select=*&ativo=eq.true&order=ordem`,{headers:H_ANON})
+    ]);
+    const cats=await rc.json(), prods=await rp.json();
+    MENU={};
+    (cats||[]).forEach(c=>{
+      const itens=(prods||[]).filter(p=>p.categoria_id===c.id).map(p=>({
+        id:p.id, nome:p.nome, desc:p.descricao||'',
+        preco:(p.preco!=null && !(Array.isArray(p.tamanhos)&&p.tamanhos.length)) ? Number(p.preco) : undefined,
+        tamanhos:(Array.isArray(p.tamanhos)&&p.tamanhos.length) ? p.tamanhos.map(t=>({nome:t.nome,preco:Number(t.preco)})) : undefined,
+        esgotado:!!p.esgotado
+      }));
+      MENU[((c.emoji||'')+' '+c.nome).trim()]={sub:c.sub||undefined, itens};
+    });
+  }catch(e){
+    document.getElementById('conteudo').innerHTML='<div class="vazio">Não foi possível carregar o cardápio. Atualize a página. 🙏</div>';
+    return;
+  }
+  montarAbas(); montarMenu();
+}
 
 /* ==== ESTADO ==== */
 let carrinho = [];
@@ -350,6 +290,7 @@ function precoBase(item){
 
 function montarAbas(){
   const nav=document.getElementById('abas');
+  nav.innerHTML='';
   Object.keys(MENU).forEach((cat,i)=>{
     const b=document.createElement('button');
     b.textContent=cat;
@@ -366,17 +307,17 @@ function montarMenu(){
   c.innerHTML='';
   Object.keys(MENU).forEach((cat,i)=>{
     const sec=MENU[cat];
-    let html=`<h2 class="secao-titulo" id="sec-${i}">${cat}</h2>`;
-    if(sec.sub)html+=`<p class="secao-sub">${sec.sub}</p>`;
+    let html=`<h2 class="secao-titulo" id="sec-${i}">${esc(cat)}</h2>`;
+    if(sec.sub)html+=`<p class="secao-sub">${esc(sec.sub)}</p>`;
     sec.itens.forEach((item,j)=>{
       let precoTxt = item.tamanhos
         ? `a partir de R$ ${brl(precoBase(item))}`
         : `R$ ${brl(item.preco)}`;
-      const itemEsg = esgotado(item.nome);
+      const itemEsg = item.esgotado;
       html+=`<div class="card${itemEsg?' card-esgotado':''}">
         <div>
-          <h3>${item.nome}${itemEsg?'<span class="badge-esg">ESGOTADO</span>':''}</h3>
-          ${item.desc?`<div class="desc">${item.desc}</div>`:''}
+          <h3>${esc(item.nome)}${itemEsg?'<span class="badge-esg">ESGOTADO</span>':''}</h3>
+          ${item.desc?`<div class="desc">${esc(item.desc)}</div>`:''}
           <div class="precos">${precoTxt}</div>
         </div>
         ${itemEsg
@@ -478,7 +419,9 @@ function adicionarAoCarrinho(){
     if(itemAtual.selCob.length)det.push("Cobertura: "+itemAtual.selCob.join(", "));
     if(itemAtual.selCreme.length)det.push("Creme: "+itemAtual.selCreme.join(", "));
   }
-  carrinho.push({nome:itemAtual.nome,detalhe:det.join(" | "),preco:precoUnit(),qtd:qtdAtual});
+  carrinho.push({id:itemAtual.id,nome:itemAtual.nome,detalhe:det.join(" | "),
+    tamanho:(itemAtual.tamanhos?itemAtual.tamanhos[itemAtual.selTamanho].nome:null),
+    preco:precoUnit(),qtd:qtdAtual});
   fecharModal('modalItem');
   atualizarCarrinho();
 }
@@ -532,13 +475,29 @@ function taxaAtual(){
   if(document.getElementById('cliEntrega').value!=='Entrega') return 0;
   return bairroSel().taxa;
 }
+let cupomAplicado=null, descontoPreview=0;
 function atualizarTotais(){
   const el=document.getElementById('resumoTotais'); if(!el) return;
-  const sub=totalCarrinho(), taxa=taxaAtual(), tot=sub+taxa;
+  const sub=totalCarrinho(), taxa=taxaAtual();
+  const desc=Math.min(descontoPreview,sub), tot=Math.max(0,sub-desc)+taxa;
   let h=`<div class="lin"><span>Subtotal</span><span>R$ ${brl(sub)}</span></div>`;
+  if(desc>0) h+=`<div class="lin" style="color:#1a7d3c"><span>Desconto (${esc(cupomAplicado||'crédito')})</span><span>− R$ ${brl(desc)}</span></div>`;
   if(taxa>0) h+=`<div class="lin"><span>Taxa de entrega</span><span>R$ ${brl(taxa)}</span></div>`;
   h+=`<div class="lin tot"><span>Total</span><span>R$ ${brl(tot)}</span></div>`;
   el.innerHTML=h;
+}
+async function aplicarCupom(){
+  const cod=document.getElementById('cliCupom').value.trim().toUpperCase();
+  const st=document.getElementById('cupomStatus');
+  cupomAplicado=null; descontoPreview=0;
+  if(!cod){ st.textContent=''; atualizarTotais(); return; }
+  try{
+    const r=await api({acao:'preview', cupom:cod, tipo:'Retirada',
+      itens:carrinho.map(i=>({id:i.id,qtd:i.qtd,tamanho:i.tamanho}))});
+    cupomAplicado=cod; descontoPreview=r.desconto;
+    st.style.color='#1a7d3c'; st.textContent='✅ Cupom aplicado: − R$ '+brl(r.desconto);
+  }catch(e){ st.style.color='#c0392b'; st.textContent='❌ '+e.message; }
+  atualizarTotais();
 }
 
 let geoLink="";
@@ -570,7 +529,7 @@ function copiarPix(){
   else{alert('Chave Pix: '+k);}
 }
 
-function enviarWhatsApp(){
+async function enviarWhatsApp(){
   if(!LOJA_ABERTA){alert('A loja está fechada no momento. Volte mais tarde! 🙏');return;}
   const nome=document.getElementById('cliNome').value.trim();
   const fone=document.getElementById('cliFone').value.trim();
@@ -585,7 +544,22 @@ function enviarWhatsApp(){
   if(entrega==='Entrega' && !geoLink && !endManual && !ref){
     alert('Envie sua localização ou descreva onde você está.');return;
   }
-  const sub=totalCarrinho(), taxa=taxaAtual(), tot=sub+taxa;
+
+  // v2: o SERVIDOR valida itens, preços, taxa e cupom, e registra o pedido
+  const btn=document.querySelector('#formCheckout .btn-zap');
+  btn.disabled=true; btn.textContent='Enviando pedido...';
+  let ped;
+  try{
+    ped=await api({acao:'criar', cliente:nome, telefone:fone||null, tipo:entrega,
+      bairro:(entrega==='Entrega'?b.nome:null),
+      itens:carrinho.map(i=>({id:i.id,qtd:i.qtd,tamanho:i.tamanho})),
+      cupom:cupomAplicado||null, pagamento:pg,
+      localizacao:geoLink||null, referencia:ref||null, endereco:endManual||null, obs:obs||null});
+  }catch(e){
+    btn.disabled=false; btn.textContent='📲 Enviar pedido pelo WhatsApp';
+    alert(e.message); return;
+  }
+  btn.disabled=false; btn.textContent='📲 Enviar pedido pelo WhatsApp';
 
   let msg=`*NOVO PEDIDO — Pão Caseiro da Elane* 🍞%0A%0A`;
   msg+=`*Cliente:* ${nome}%0A`;
@@ -602,20 +576,16 @@ function enviarWhatsApp(){
     msg+=`• ${i.qtd}x ${i.nome} — R$ ${brl(i.preco*i.qtd)}%0A`;
     if(i.detalhe)msg+=`  _${i.detalhe}_%0A`;
   });
-  msg+=`%0A*Subtotal: R$ ${brl(sub)}*%0A`;
-  if(taxa>0)msg+=`*Taxa de entrega: R$ ${brl(taxa)}*%0A`;
-  msg+=`*Total: R$ ${brl(tot)}*%0A`;
+  msg+=`%0A*Subtotal: R$ ${brl(ped.subtotal)}*%0A`;
+  if(ped.desconto>0)msg+=`*Desconto${cupomAplicado?' ('+cupomAplicado+')':''}: − R$ ${brl(ped.desconto)}*%0A`;
+  if(ped.taxa>0)msg+=`*Taxa de entrega: R$ ${brl(ped.taxa)}*%0A`;
+  msg+=`*Total: R$ ${brl(ped.total)}*%0A`;
   msg+=`*Pagamento:* ${pg}%0A`;
   if(pg==='Pix')msg+=`*Chave Pix:* ${PIX}%0A_Envie o comprovante aqui para confirmar o pedido._%0A`;
   if(obs)msg+=`*Obs:* ${obs}%0A`;
+  msg+=`_Pedido nº ${String(ped.id).slice(0,8)}_%0A`;
   msg=msg.replace(/\|/g,'-');
-  gravarPedido({
-    cliente:nome, telefone:fone||null, tipo:entrega, bairro:(entrega==='Entrega'?b.nome:null),
-    itens:carrinho.map(i=>({nome:i.nome,detalhe:i.detalhe,preco:i.preco,qtd:i.qtd})),
-    total:tot, taxa_entrega:taxa, pagamento:pg,
-    localizacao:geoLink||null, referencia:ref||null, endereco:endManual||null,
-    obs:obs||null, origem:'cardapio'
-  });
+  api({acao:'confirmar', id:ped.id}).catch(()=>{});
   window.open(`https://wa.me/${WHATSAPP}?text=${msg}`,'_blank');
 }
 
@@ -623,7 +593,7 @@ function fecharModal(id){document.getElementById(id).classList.remove('aberto');
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('aberto');}));
 
 /* init */
-montarAbas();montarMenu();atualizarCarrinho();carregarConfig();
+carregarCardapio();atualizarCarrinho();carregarConfig();
 </script>
 </body>
 </html>
