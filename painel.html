@@ -30,14 +30,20 @@
   .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
   .chip{background:#fff;border:1px solid #ddd;border-radius:20px;padding:7px 14px;cursor:pointer;font-size:.82rem;font-weight:600;color:var(--roxo)}
   .chip.ativo{background:var(--roxo);color:#fff;border-color:var(--roxo)}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
-  .kpi{background:#fff;border-radius:14px;padding:16px;box-shadow:var(--sombra)}
-  .kpi .lbl{font-size:.78rem;color:#888;font-weight:600}
-  .kpi .val{font-size:1.7rem;font-weight:800;color:var(--roxo);margin-top:4px}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
-  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
-  .box{background:#fff;border-radius:14px;padding:16px;box-shadow:var(--sombra)}
-  .box h3{font-size:.95rem;color:var(--roxo);margin-bottom:12px}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+  @media(max-width:760px){.cards{grid-template-columns:1fr 1fr}}
+  .kpi{background:#fff;border-radius:12px;padding:10px 14px;box-shadow:var(--sombra)}
+  .kpi .lbl{font-size:.72rem;color:#888;font-weight:600}
+  .kpi .val{font-size:1.25rem;font-weight:800;color:var(--roxo);margin-top:2px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+  @media(max-width:1000px){.grid4{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.grid4{grid-template-columns:1fr}}
+  .box{background:#fff;border-radius:12px;padding:12px;box-shadow:var(--sombra)}
+  .box h3{font-size:.8rem;color:var(--roxo);margin-bottom:8px}
+  .grid4 .box{height:170px;overflow:hidden}
+  .grid4 .box canvas{max-height:130px}
+  #rankItens{max-height:132px;overflow:auto;font-size:.78rem}
+  #rankItens .rank-item{padding:3px 0;font-size:.78rem}
   table{width:100%;border-collapse:collapse;font-size:.82rem}
   th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #eee;vertical-align:top}
   th{color:#888;font-weight:700;font-size:.72rem;text-transform:uppercase}
@@ -107,12 +113,10 @@
       <div class="kpi"><div class="lbl">Pedidos hoje</div><div class="val" id="kHoje">0</div></div>
     </div>
 
-    <div class="grid2">
-      <div class="box"><h3>Vendas por dia</h3><canvas id="chDia" height="160"></canvas></div>
-      <div class="box"><h3>Formas de pagamento</h3><canvas id="chPg" height="160"></canvas></div>
-    </div>
-    <div class="grid2">
-      <div class="box"><h3>Horários de pico</h3><canvas id="chHora" height="160"></canvas></div>
+    <div class="grid4">
+      <div class="box"><h3>Vendas por dia</h3><canvas id="chDia" height="130"></canvas></div>
+      <div class="box"><h3>Formas de pagamento</h3><canvas id="chPg" height="130"></canvas></div>
+      <div class="box"><h3>Horários de pico</h3><canvas id="chHora" height="130"></canvas></div>
       <div class="box"><h3>Itens mais vendidos</h3><div id="rankItens"></div></div>
     </div>
 
@@ -396,8 +400,10 @@ function desenhar(id,tipo,labels,data,label,cor){
   if(charts[id])charts[id].destroy();
   charts[id]=new Chart(document.getElementById(id),{
     type:tipo,
-    data:{labels,datasets:[{label,data,backgroundColor:cor,borderRadius:6}]},
-    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}},maintainAspectRatio:false}
+    data:{labels,datasets:[{label,data,backgroundColor:cor,borderRadius:4}]},
+    options:{animation:false,plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true,ticks:{font:{size:9}}},x:{ticks:{font:{size:9}}}},
+      maintainAspectRatio:false}
   });
 }
 function desenharPie(id,labels,data){
@@ -405,7 +411,9 @@ function desenharPie(id,labels,data){
   charts[id]=new Chart(document.getElementById(id),{
     type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:['#b45309','#fbbf24','#25d366','#1565c0','#c0392b','#8d6e63']}]},
-    options:{plugins:{legend:{position:'bottom'}},maintainAspectRatio:false}
+    options:{animation:false,cutout:'62%',
+      plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10,padding:4}}},
+      maintainAspectRatio:false}
   });
 }
 
@@ -508,6 +516,11 @@ async function toggleLoja(){
 
 /* auto-login se já tiver sessão válida salva */
 if(token){ entrar(); }
+
+/* atualização automática a cada 2 minutos (só com o painel aberto e aba visível) */
+setInterval(()=>{
+  if(document.getElementById('app').style.display!=='none' && !document.hidden) carregar();
+}, 120000);
 </script>
 </body>
 </html>
