@@ -11,15 +11,30 @@
     --cinza:#fbf7f2;--verde:#25d366;--sombra:0 4px 16px rgba(0,0,0,.12)}
   *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,Arial,sans-serif}
   body{background:var(--cinza);color:var(--roxo3)}
-  header{background:linear-gradient(135deg,var(--roxo),var(--roxo2));color:#fff;padding:16px 20px;
-    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-  header h1{font-size:1.2rem;color:var(--amarelo)}
-  header h1 small{display:block;color:#fff;font-size:.7rem;font-weight:400;opacity:.85}
+  /* ===== SIDEBAR (menu lateral esquerdo) ===== */
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:198px;z-index:150;
+    background:linear-gradient(180deg,var(--roxo),var(--roxo2));
+    display:flex;flex-direction:column;gap:4px;padding:16px 10px;overflow-y:auto}
+  .sidebar .marca{color:var(--amarelo);font-weight:800;font-size:1rem;line-height:1.25;
+    padding:0 8px 12px;border-bottom:1px solid rgba(255,255,255,.15);margin-bottom:10px}
+  .sidebar .marca small{display:block;color:#fff;font-size:.66rem;font-weight:400;opacity:.8;margin-top:3px}
+  .sb-btn{display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:none;
+    color:#fff;padding:10px 10px;border-radius:9px;font-size:.86rem;font-weight:600;cursor:pointer;text-align:left}
+  .sb-btn:hover{background:rgba(255,255,255,.14)}
+  .sb-btn .ic{font-size:1.05rem;width:22px;text-align:center;flex-shrink:0}
+  .sb-btn.sb-sair{margin-top:auto;color:#ffd7d7}
+  @media(max-width:760px){
+    .sidebar{width:56px;padding:12px 6px}
+    .sidebar .marca{font-size:.9rem;text-align:center;padding:0 0 10px}
+    .sidebar .marca small,.sb-btn .sb-txt{display:none}
+    .sb-btn{justify-content:center;padding:10px 4px}
+  }
   .btn{background:var(--amarelo);color:var(--roxo);border:none;border-radius:8px;padding:9px 14px;
     font-weight:700;cursor:pointer;font-size:.85rem}
   .btn-sec{background:#fff;color:var(--roxo);border:1px solid #ddd}
   .btn-roxo{background:var(--roxo);color:#fff}
-  .wrap{max-width:1100px;margin:0 auto;padding:18px}
+  .wrap{margin-left:198px;padding:16px 18px}
+  @media(max-width:760px){.wrap{margin-left:56px;padding:12px}}
   /* login */
   #login{max-width:380px;margin:8vh auto;background:#fff;border-radius:16px;padding:28px;box-shadow:var(--sombra);text-align:center}
   #login h2{color:var(--roxo);margin-bottom:6px}
@@ -73,19 +88,17 @@
 
 <!-- APP -->
 <div id="app" style="display:none">
-  <header>
-    <h1>🍞 Painel de Vendas <small>Pão Caseiro da Elane — Canoa Quebrada / Aracati-CE</small></h1>
-    <div>
-      <button class="btn" onclick="abrirModal('modalPedido')">➕ Novo pedido</button>
-      <button class="btn" onclick="abrirModal('modalEsg')">🍽️ Cardápio</button>
-      <button class="btn" onclick="abrirModal('modalCup')">🎟️ Cupons</button>
-      <button class="btn btn-sec" onclick="carregar()">🔄 Atualizar</button>
-      <button class="btn btn-sec" onclick="exportarCSV()">⬇️ CSV vendas</button>
-      <button class="btn btn-sec" onclick="exportarClientes()">📇 Clientes</button>
-      <button class="btn btn-sec" onclick="trocarSenha()">🔑 Senha</button>
-      <button class="btn btn-sec" onclick="sair()">Sair</button>
-    </div>
-  </header>
+  <aside class="sidebar">
+    <div class="marca">🍞 <span class="sb-txt">Pão Caseiro da Elane</span><small>Painel de Vendas</small></div>
+    <button class="sb-btn" onclick="abrirModal('modalPedido')"><span class="ic">➕</span><span class="sb-txt">Novo pedido</span></button>
+    <button class="sb-btn" onclick="abrirModal('modalEsg')"><span class="ic">🍽️</span><span class="sb-txt">Cardápio</span></button>
+    <button class="sb-btn" onclick="abrirModal('modalCup')"><span class="ic">🎟️</span><span class="sb-txt">Cupons</span></button>
+    <button class="sb-btn" onclick="carregar()"><span class="ic">🔄</span><span class="sb-txt">Atualizar</span></button>
+    <button class="sb-btn" onclick="exportarCSV()"><span class="ic">⬇️</span><span class="sb-txt">CSV vendas</span></button>
+    <button class="sb-btn" onclick="exportarClientes()"><span class="ic">📇</span><span class="sb-txt">Clientes</span></button>
+    <button class="sb-btn" onclick="trocarSenha()"><span class="ic">🔑</span><span class="sb-txt">Trocar senha</span></button>
+    <button class="sb-btn sb-sair" onclick="sair()"><span class="ic">🚪</span><span class="sb-txt">Sair</span></button>
+  </aside>
   <div class="wrap">
     <div class="box" id="boxLoja" style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <div style="font-size:1rem">🏪 Status da loja: <strong id="lojaTxt">—</strong></div>
