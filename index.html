@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pão Caseiro da Elane — Delivery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --roxo:#2c1200; --roxo2:#5c2d00; --roxo3:#1a0a00;
@@ -12,14 +15,15 @@
     --verde:#25d366; --sombra:0 6px 22px rgba(0,0,0,.18);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--cinza);color:var(--texto);padding-bottom:90px}
+  body{font-family:'Nunito','Segoe UI',system-ui,Arial,sans-serif;background:var(--cinza);color:var(--texto);padding-bottom:90px}
   header{
     background:linear-gradient(135deg,var(--roxo),var(--roxo2));
     color:var(--amarelo);text-align:center;padding:22px 16px;position:relative;
     box-shadow:var(--sombra)
   }
-  header h1{font-size:1.9rem;letter-spacing:1px}
+  header h1{font-size:1.9rem;letter-spacing:.5px;font-family:'Fraunces',Georgia,serif;font-weight:800}
   header p{color:#fff;font-size:.85rem;margin-top:4px;opacity:.9}
+  header .tagline{font-family:'Fraunces',Georgia,serif;font-style:italic;font-size:.82rem;color:var(--amarelo);opacity:.95;margin-top:2px}
   .status{display:inline-block;margin-top:8px;background:var(--verde);color:#fff;
     font-size:.75rem;padding:3px 12px;border-radius:20px;font-weight:600}
   nav{position:sticky;top:0;z-index:50;background:var(--roxo3);display:flex;gap:6px;
@@ -30,7 +34,8 @@
   nav button.ativo{background:var(--amarelo);color:var(--roxo);border-color:var(--amarelo)}
   main{max-width:760px;margin:0 auto;padding:16px}
   .secao-titulo{color:var(--roxo);font-size:1.3rem;margin:22px 0 10px;
-    border-left:5px solid var(--amarelo);padding-left:10px}
+    border-left:5px solid var(--amarelo);padding-left:10px;font-family:'Fraunces',Georgia,serif;font-weight:800}
+  .card .thumb{width:76px;height:76px;border-radius:12px;object-fit:cover;flex-shrink:0;background:#f0e2cf}
   .secao-sub{font-size:.85rem;color:#8a6d55;margin:-6px 0 12px;padding-left:15px}
   .card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;
     box-shadow:var(--sombra);display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
@@ -114,7 +119,8 @@
 <body>
 
 <header>
-  <h1>🍞 PÃO CASEIRO DA ELANE</h1>
+  <h1>🍞 Pão Caseiro da Elane</h1>
+  <p class="tagline">Sabor de casa, carinho que faz a diferença ❤</p>
   <p>Canoa Quebrada • Aracati — CE</p>
   <span class="status" id="statusLoja">● Aberto agora</span>
 </header>
@@ -264,6 +270,8 @@ async function carregarCardapio(){
         id:p.id, nome:p.nome, desc:p.descricao||'',
         preco:(p.preco!=null && !(Array.isArray(p.tamanhos)&&p.tamanhos.length)) ? Number(p.preco) : undefined,
         tamanhos:(Array.isArray(p.tamanhos)&&p.tamanhos.length) ? p.tamanhos.map(t=>({nome:t.nome,preco:Number(t.preco)})) : undefined,
+        opcoes:(Array.isArray(p.opcoes)&&p.opcoes.length) ? p.opcoes : undefined,
+        img:p.img||null,
         esgotado:!!p.esgotado
       }));
       MENU[((c.emoji||'')+' '+c.nome).trim()]={sub:c.sub||undefined, itens};
@@ -315,7 +323,8 @@ function montarMenu(){
         : `R$ ${brl(item.preco)}`;
       const itemEsg = item.esgotado;
       html+=`<div class="card${itemEsg?' card-esgotado':''}">
-        <div>
+        ${item.img?`<img class="thumb" src="${esc(item.img)}" alt="" loading="lazy">`:''}
+        <div style="flex:1">
           <h3>${esc(item.nome)}${itemEsg?'<span class="badge-esg">ESGOTADO</span>':''}</h3>
           ${item.desc?`<div class="desc">${esc(item.desc)}</div>`:''}
           <div class="precos">${precoTxt}</div>
@@ -336,6 +345,7 @@ function abrirItem(cat,j){
   itemAtual.cat=cat;
   itemAtual.selTamanho = itemAtual.tamanhos ? 0 : null;
   itemAtual.selAd=[]; itemAtual.selAdExtra=[]; itemAtual.selCob=[]; itemAtual.selCreme=[];
+  itemAtual.selOpcoes={};
   qtdAtual=1;
   document.getElementById('qtdItem').textContent=1;
   document.getElementById('itemNome').textContent=itemAtual.nome;
@@ -352,6 +362,16 @@ function renderItemConteudo(){
       const adInfo = t.ad ? ` <small style="color:#888">• ${t.ad} adicionais</small>`:'';
       h+=`<div class="tamanho-op ${itemAtual.selTamanho===i?'sel':''}" onclick="selTamanho(${i})">
         <span>${t.nome}${adInfo}</span><span class="preco-tag">R$ ${brl(t.preco)}</span></div>`;
+    });
+  }
+  if(Array.isArray(itemAtual.opcoes)){
+    itemAtual.opcoes.forEach((g,gi)=>{
+      const max=g.max||1;
+      h+=`<div class="grupo-titulo">${esc(g.titulo)} <small>(${max===1?'escolha 1':'escolha até '+max})${(g.min||0)>0?' • obrigatório':''}</small></div>`;
+      (g.itens||[]).forEach(op=>{
+        const marcado=(itemAtual.selOpcoes[g.titulo]||[]).includes(op);
+        h+=`<label class="opc"><input type="${max===1?'radio':'checkbox'}" name="opg-${gi}" ${marcado?'checked':''} onchange="selOpcao(${gi},this)" data-op="${esc(op)}"><span class="nm">${esc(op)}</span></label>`;
+      });
     });
   }
   if(itemAtual.montavel){
@@ -386,6 +406,16 @@ function selTamanho(i){
   if(itemAtual.montavel){itemAtual.selAd=[];}
   renderItemConteudo();
 }
+function selOpcao(gi,el){
+  const g=itemAtual.opcoes[gi], op=el.getAttribute('data-op'), max=g.max||1;
+  let arr=itemAtual.selOpcoes[g.titulo]||[];
+  if(max===1){ arr=[op]; }
+  else if(el.checked){
+    if(arr.length>=max){ el.checked=false; alert('Escolha no máximo '+max+' em '+g.titulo+'.'); return; }
+    arr=[...arr,op];
+  } else { arr=arr.filter(x=>x!==op); }
+  itemAtual.selOpcoes[g.titulo]=arr;
+}
 function toggleAd(campo,val,limite,el){
   const arr=itemAtual[campo];
   if(el.checked){
@@ -413,6 +443,13 @@ function atualizarPrecoItem(){
 function adicionarAoCarrinho(){
   let det=[];
   if(itemAtual.tamanhos)det.push(itemAtual.tamanhos[itemAtual.selTamanho].nome);
+  if(Array.isArray(itemAtual.opcoes)){
+    for(const g of itemAtual.opcoes){
+      const sel=itemAtual.selOpcoes[g.titulo]||[];
+      if((g.min||0)>sel.length){alert('Escolha '+(g.min===1?'1 opção':g.min+' opções')+' de '+g.titulo+' 🍽️');return;}
+      if(sel.length)det.push(g.titulo+': '+sel.join(', '));
+    }
+  }
   if(itemAtual.montavel){
     if(itemAtual.selAd.length)det.push("Adicionais: "+itemAtual.selAd.join(", "));
     if(itemAtual.selAdExtra.length)det.push("Extras: "+itemAtual.selAdExtra.join(", "));
@@ -421,6 +458,7 @@ function adicionarAoCarrinho(){
   }
   carrinho.push({id:itemAtual.id,nome:itemAtual.nome,detalhe:det.join(" | "),
     tamanho:(itemAtual.tamanhos?itemAtual.tamanhos[itemAtual.selTamanho].nome:null),
+    opcoes:(Array.isArray(itemAtual.opcoes)?itemAtual.selOpcoes:undefined),
     preco:precoUnit(),qtd:qtdAtual});
   fecharModal('modalItem');
   atualizarCarrinho();
@@ -493,7 +531,7 @@ async function aplicarCupom(){
   if(!cod){ st.textContent=''; atualizarTotais(); return; }
   try{
     const r=await api({acao:'preview', cupom:cod, tipo:'Retirada',
-      itens:carrinho.map(i=>({id:i.id,qtd:i.qtd,tamanho:i.tamanho}))});
+      itens:carrinho.map(i=>({id:i.id,qtd:i.qtd,tamanho:i.tamanho,opcoes:i.opcoes}))});
     cupomAplicado=cod; descontoPreview=r.desconto;
     st.style.color='#1a7d3c'; st.textContent='✅ Cupom aplicado: − R$ '+brl(r.desconto);
   }catch(e){ st.style.color='#c0392b'; st.textContent='❌ '+e.message; }
@@ -552,7 +590,7 @@ async function enviarWhatsApp(){
   try{
     ped=await api({acao:'criar', cliente:nome, telefone:fone||null, tipo:entrega,
       bairro:(entrega==='Entrega'?b.nome:null),
-      itens:carrinho.map(i=>({id:i.id,qtd:i.qtd,tamanho:i.tamanho})),
+      itens:carrinho.map(i=>({id:i.id,qtd:i.qtd,tamanho:i.tamanho,opcoes:i.opcoes})),
       cupom:cupomAplicado||null, pagamento:pg,
       localizacao:geoLink||null, referencia:ref||null, endereco:endManual||null, obs:obs||null});
   }catch(e){
