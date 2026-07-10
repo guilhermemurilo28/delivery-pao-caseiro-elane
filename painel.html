@@ -79,7 +79,7 @@
 
 <!-- LOGIN -->
 <div id="login">
-  <h2>🍞 Painel Pão Caseiro da Elane</h2>
+  <h2 id="loginTitulo">🍞 Painel Pão Caseiro da Elane</h2>
   <p>Acesso restrito ao proprietário</p>
   <input type="password" id="senha" placeholder="Senha do painel" onkeydown="if(event.key==='Enter')entrar()">
   <div class="erro" id="loginErro"></div>
@@ -89,7 +89,7 @@
 <!-- APP -->
 <div id="app" style="display:none">
   <aside class="sidebar">
-    <div class="marca">🍞 <span class="sb-txt">Pão Caseiro da Elane</span><small>Painel de Vendas</small></div>
+    <div class="marca"><span id="sbEmoji">🍞</span> <span class="sb-txt" id="sbNome">Pão Caseiro da Elane</span><small>Painel de Vendas</small></div>
     <button class="sb-btn" onclick="abrirModal('modalPedido')"><span class="ic">➕</span><span class="sb-txt">Novo pedido</span></button>
     <button class="sb-btn" onclick="abrirModal('modalEsg')"><span class="ic">🍽️</span><span class="sb-txt">Cardápio</span></button>
     <button class="sb-btn" onclick="abrirModal('modalCup')"><span class="ic">🎟️</span><span class="sb-txt">Cupons</span></button>
@@ -508,8 +508,21 @@ async function trocarSenha(){
 let lojaAberta=true;
 async function carregarStatus(){
   try{
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/config_publica?select=loja_aberta`,{headers:{"apikey":ANON,"Authorization":`Bearer ${ANON}`}});
-    const d=await r.json(); lojaAberta=(d&&d[0])?d[0].loja_aberta:true;
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/config_publica?select=*`,{headers:{"apikey":ANON,"Authorization":`Bearer ${ANON}`}});
+    const d=await r.json();
+    if(d&&d[0]){
+      const c=d[0]; lojaAberta=c.loja_aberta;
+      /* identidade da loja vinda do banco */
+      if(c.nome){
+        document.getElementById('sbNome').textContent=c.nome;
+        document.getElementById('loginTitulo').textContent=(c.emoji?c.emoji+' ':'')+'Painel '+c.nome;
+        document.title='Painel — '+c.nome;
+      }
+      if(c.emoji) document.getElementById('sbEmoji').textContent=c.emoji;
+      const rt=document.documentElement.style;
+      if(c.cor1){ rt.setProperty('--roxo',c.cor1); rt.setProperty('--roxo2',c.cor2||c.cor1); rt.setProperty('--roxo3',c.cor3||c.cor1); }
+      if(c.cor4){ rt.setProperty('--amarelo',c.cor4); rt.setProperty('--amarelo2',c.cor5||c.cor4); }
+    }
   }catch(e){}
   pintarStatus();
 }

@@ -119,9 +119,9 @@
 <body>
 
 <header>
-  <h1>🍞 Pão Caseiro da Elane</h1>
-  <p class="tagline">Sabor de casa, carinho que faz a diferença ❤</p>
-  <p>Canoa Quebrada • Aracati — CE</p>
+  <h1 id="lojaNome">🍞 Pão Caseiro da Elane</h1>
+  <p class="tagline" id="lojaTag">Sabor de casa, carinho que faz a diferença ❤</p>
+  <p id="lojaCidade">Canoa Quebrada • Aracati — CE</p>
   <span class="status" id="statusLoja">● Aberto agora</span>
 </header>
 
@@ -220,8 +220,11 @@
 /* ═══════════════════════════════════════════
    CONFIG DO CLIENTE — altere apenas aqui
    ═══════════════════════════════════════════ */
-const WHATSAPP = "5588996073668"; // Pão Caseiro da Elane
-const PIX = "d5f22d0d-b130-4615-91b6-7e887bcf2956"; // Chave Pix aleatória
+/* Identidade e contatos vêm do BANCO (config_publica) — estes são apenas fallbacks */
+let WHATSAPP = "5588996073668";
+let PIX = "d5f22d0d-b130-4615-91b6-7e887bcf2956";
+let LOJA_NOME = "Pão Caseiro da Elane";
+let LOJA_EMOJI = "🍞";
 
 /* Supabase — v2: pedidos validados no SERVIDOR via Edge Function */
 const SUPABASE_URL = "https://fjlmdqxnxcitzfkumbow.supabase.co";
@@ -242,7 +245,31 @@ async function carregarConfig(){
   try{
     const r=await fetch(`${SUPABASE_URL}/rest/v1/config_publica?select=*`,{headers:H_ANON});
     const d=await r.json();
-    if(d && d[0]) LOJA_ABERTA = d[0].loja_aberta;
+    if(d && d[0]){
+      const c=d[0];
+      LOJA_ABERTA = c.loja_aberta;
+      /* identidade da loja vinda do banco */
+      if(c.whatsapp) WHATSAPP=c.whatsapp;
+      if(c.pix){ PIX=c.pix; const pk=document.getElementById('pixKey'); if(pk) pk.textContent=PIX; }
+      if(c.nome){
+        LOJA_NOME=c.nome; LOJA_EMOJI=c.emoji||'';
+        document.getElementById('lojaNome').textContent=(c.emoji?c.emoji+' ':'')+c.nome;
+        document.title=c.nome+' — Delivery';
+      }
+      if(c.tagline) document.getElementById('lojaTag').textContent=c.tagline;
+      if(c.cidade) document.getElementById('lojaCidade').textContent=c.cidade;
+      const rt=document.documentElement.style;
+      if(c.cor1){ rt.setProperty('--roxo',c.cor1); rt.setProperty('--roxo2',c.cor2||c.cor1); rt.setProperty('--roxo3',c.cor3||c.cor1); }
+      if(c.cor4){ rt.setProperty('--amarelo',c.cor4); rt.setProperty('--amarelo2',c.cor5||c.cor4); }
+    }
+    /* bairros e taxas vindos do banco */
+    const rb=await fetch(`${SUPABASE_URL}/rest/v1/bairros?select=nome,taxa&ativo=eq.true&order=nome`,{headers:H_ANON});
+    const bs=await rb.json();
+    if(Array.isArray(bs)&&bs.length){
+      document.getElementById('cliBairro').innerHTML=
+        '<option value="0" data-nome="">Selecione o bairro</option>'+
+        bs.map(b=>`<option value="${Number(b.taxa)}" data-nome="${esc(b.nome)}">${esc(b.nome)} — R$ ${Number(b.taxa).toFixed(2).replace('.',',')}</option>`).join('');
+    }
   }catch(e){ LOJA_ABERTA = true; }
   const b=document.getElementById('statusLoja');
   if(b){
@@ -599,7 +626,7 @@ async function enviarWhatsApp(){
   }
   btn.disabled=false; btn.textContent='📲 Enviar pedido pelo WhatsApp';
 
-  let msg=`*NOVO PEDIDO — Pão Caseiro da Elane* 🍞%0A%0A`;
+  let msg=`*NOVO PEDIDO — ${LOJA_NOME}* ${LOJA_EMOJI}%0A%0A`;
   msg+=`*Cliente:* ${nome}%0A`;
   if(fone)msg+=`*WhatsApp:* ${fone}%0A`;
   msg+=`*Tipo:* ${entrega}%0A`;
