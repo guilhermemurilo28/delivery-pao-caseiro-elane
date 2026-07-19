@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --roxo:#2c1200; --roxo2:#5c2d00; --roxo3:#1a0a00;
@@ -116,6 +117,27 @@
   .resumo-tot .lin.tot{font-weight:800;color:var(--roxo);font-size:1.05rem;border-top:1px solid #ecdcc8;margin-top:4px;padding-top:6px}
   .busca-box input{width:100%;padding:12px 14px;border:1px solid #e0d2bd;border-radius:12px;
     font-size:.95rem;font-family:inherit;background:#fff;box-shadow:var(--sombra);margin-top:6px}
+  /* checkout v3 */
+  .campo-erro{border-color:#c0392b !important;background:#fff5f5}
+  .btn-zap:disabled{background:#c5c5c5;cursor:not-allowed}
+  .falta{font-size:.8rem;color:#c0392b;min-height:18px;margin:4px 0 6px;text-align:center}
+  .pix-qr{display:flex;justify-content:center;margin:10px 0}
+  .pix-qr img,.pix-qr canvas{border:6px solid #fff;border-radius:8px}
+  .pix-cc{width:100%;font-family:monospace;font-size:.68rem;border:1px dashed var(--amarelo2);
+    border-radius:8px;padding:8px;background:#fff;color:#555;resize:none;margin-bottom:8px;word-break:break-all}
+  /* acompanhamento */
+  .tl{list-style:none;margin:14px 0}
+  .tl li{display:flex;gap:12px;align-items:flex-start;padding:0 0 18px 0;position:relative}
+  .tl li::before{content:'';position:absolute;left:11px;top:26px;bottom:0;width:2px;background:#eee}
+  .tl li:last-child::before{display:none}
+  .tl .pt{width:24px;height:24px;border-radius:50%;background:#eee;color:#999;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;z-index:1}
+  .tl li.feito .pt{background:var(--verde);color:#fff}
+  .tl li.atual .pt{background:var(--amarelo);color:var(--roxo);box-shadow:0 0 0 4px #fff3d1}
+  .tl .tx{font-size:.9rem;font-weight:700;color:#999;padding-top:2px}
+  .tl li.feito .tx,.tl li.atual .tx{color:var(--roxo)}
+  .acomp-total{background:#fdf9f3;border:1px solid #ecdcc8;border-radius:10px;padding:10px 14px;
+    display:flex;justify-content:space-between;font-weight:800;color:var(--roxo)}
   .modal-foto{width:100%;max-height:250px;object-fit:cover;border-radius:12px;margin-bottom:12px;background:#f0e2cf}
   /* ===== Navegação lateral (desktop/tablet) ===== */
   @media(min-width:900px){
@@ -220,9 +242,10 @@
       </div>
       <div id="boxPix" class="box-pix">
         <div class="pix-tit">Pague com Pix</div>
-        <div class="pix-chave" id="pixKey" style="font-size:.85rem">d5f22d0d-b130-4615-91b6-7e887bcf2956</div>
-        <button type="button" class="btn-copiar" onclick="copiarPix()">📋 Copiar chave Pix</button>
-        <p class="pix-info">Faça o Pix do valor total e <strong>envie o comprovante aqui no WhatsApp</strong> para confirmarmos seu pedido.</p>
+        <div class="pix-qr" id="pixQr"></div>
+        <textarea class="pix-cc" id="pixCC" rows="3" readonly onclick="this.select()"></textarea>
+        <button type="button" class="btn-copiar" onclick="copiarPix()">📋 Copiar Pix copia e cola</button>
+        <p class="pix-info">Escaneie o QR ou copie o código acima e cole no app do seu banco — <strong>já vai com o valor certinho</strong>. Depois envie o comprovante no WhatsApp.</p>
       </div>
       <label>Cupom de desconto (opcional)</label>
       <div style="display:flex;gap:8px;align-items:flex-start">
@@ -233,10 +256,24 @@
       <label>Observações (opcional)</label>
       <textarea id="cliObs" rows="2" placeholder="Ex.: pastel sem cebola, troco para R$50..."></textarea>
       <div id="resumoTotais" class="resumo-tot"></div>
-      <button class="btn-zap" onclick="enviarWhatsApp()">📲 Enviar pedido pelo WhatsApp</button>
+      <div class="falta" id="faltaInfo"></div>
+      <button class="btn-zap" id="btnEnviar" onclick="enviarWhatsApp()">📲 Enviar pedido pelo WhatsApp</button>
       <p class="aviso">O pedido é confirmado pela loja no WhatsApp. No Pix, envie o comprovante para confirmar.</p>
     </div>
     <button class="btn-zap" id="btnIrCheckout" onclick="irParaCheckout()">Finalizar pedido</button>
+  </div>
+</div>
+
+<!-- Modal acompanhar pedido -->
+<div class="modal-bg" id="modalAcomp">
+  <div class="modal">
+    <button class="fechar" onclick="fecharModal('modalAcomp')">&times;</button>
+    <h2>🔎 Acompanhe seu pedido</h2>
+    <p class="desc" id="acompInfo" style="margin-bottom:6px"></p>
+    <ul class="tl" id="acompTimeline"></ul>
+    <div id="acompItens"></div>
+    <div class="acomp-total" id="acompTotal" style="display:none"></div>
+    <p class="aviso" id="acompAviso">Esta página atualiza sozinha a cada 30 segundos.</p>
   </div>
 </div>
 
@@ -553,6 +590,16 @@ function removerItem(i){carrinho.splice(i,1);atualizarCarrinho();renderCarrinho(
 function irParaCheckout(){
   document.getElementById('formCheckout').style.display='block';
   document.getElementById('btnIrCheckout').style.display='none';
+  // preenche com os dados da última compra
+  try{
+    const d=JSON.parse(localStorage.getItem('cli_dados')||'{}');
+    const n=document.getElementById('cliNome'), f=document.getElementById('cliFone'), r=document.getElementById('cliRef');
+    if(d.nome&&!n.value)n.value=d.nome;
+    if(d.fone&&!f.value)f.value=d.fone;
+    if(d.ref&&!r.value)r.value=d.ref;
+    if(d.bairro){const s=document.getElementById('cliBairro');
+      [...s.options].forEach((o,i)=>{if(o.getAttribute('data-nome')===d.bairro)s.selectedIndex=i;});}
+  }catch(e){}
   togglePix();
   atualizarTotais();
 }
@@ -581,6 +628,8 @@ function atualizarTotais(){
   if(taxa>0) h+=`<div class="lin"><span>Taxa de entrega</span><span>R$ ${brl(taxa)}</span></div>`;
   h+=`<div class="lin tot"><span>Total</span><span>R$ ${brl(tot)}</span></div>`;
   el.innerHTML=h;
+  atualizarPix(tot);
+  checkoutValido();
 }
 async function aplicarCupom(){
   const cod=document.getElementById('cliCupom').value.trim().toUpperCase();
@@ -607,10 +656,12 @@ function pegarLocalizacao(){
   navigator.geolocation.getCurrentPosition(
     p=>{const la=p.coords.latitude.toFixed(6),ln=p.coords.longitude.toFixed(6);
       geoLink=`https://maps.google.com/?q=${la},${ln}`;
-      st.innerHTML='✅ Localização capturada — <a href="'+geoLink+'" target="_blank">ver no mapa</a>';},
+      st.innerHTML='✅ Localização capturada — <a href="'+geoLink+'" target="_blank">ver no mapa</a>';
+      checkoutValido();},
     ()=>{geoLink="";
       st.textContent='Não consegui pegar o GPS. Descreva o endereço abaixo.';
-      document.getElementById('boxEndManual').style.display='block';},
+      document.getElementById('boxEndManual').style.display='block';
+      checkoutValido();},
     {enableHighAccuracy:true,timeout:10000}
   );
 }
@@ -618,11 +669,57 @@ function togglePix(){
   const pg=document.querySelector('input[name=pg]:checked').value;
   document.getElementById('boxPix').style.display = pg==='Pix' ? 'block':'none';
 }
+/* ==== PIX BR CODE (copia e cola oficial, com valor) ==== */
+function emv(id,v){v=String(v);return id+String(v.length).padStart(2,'0')+v}
+function crc16(s){let c=0xFFFF;
+  for(let i=0;i<s.length;i++){c^=s.charCodeAt(i)<<8;
+    for(let j=0;j<8;j++)c=(c&0x8000)?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF;}
+  return c.toString(16).toUpperCase().padStart(4,'0')}
+function gerarBRCode(valor){
+  const mai=emv('00','br.gov.bcb.pix')+emv('01',PIX);
+  let p=emv('00','01')+emv('26',mai)+emv('52','0000')+emv('53','986');
+  if(valor>0)p+=emv('54',valor.toFixed(2));
+  p+=emv('58','BR')+emv('59','PAO CASEIRO DA ELANE')+emv('60','ARACATI')+emv('62',emv('05','***'));
+  p+='6304'; return p+crc16(p);
+}
+let pixCodigoAtual='';
+function atualizarPix(total){
+  const cc=document.getElementById('pixCC'); if(!cc)return;
+  pixCodigoAtual=gerarBRCode(total);
+  cc.value=pixCodigoAtual;
+  const qr=document.getElementById('pixQr'); qr.innerHTML='';
+  if(window.QRCode) new QRCode(qr,{text:pixCodigoAtual,width:170,height:170,correctLevel:QRCode.CorrectLevel.M});
+}
 function copiarPix(){
-  const k=document.getElementById('pixKey').textContent.trim();
+  const k=pixCodigoAtual||PIX;
   if(navigator.clipboard){navigator.clipboard.writeText(k).then(
-    ()=>alert('Chave Pix copiada: '+k), ()=>alert('Chave Pix: '+k));}
-  else{alert('Chave Pix: '+k);}
+    ()=>alert('✅ Pix copia e cola copiado! Agora é só colar no app do seu banco.'),
+    ()=>{document.getElementById('pixCC').select();alert('Selecione e copie o código Pix.');});}
+  else{document.getElementById('pixCC').select();alert('Selecione e copie o código Pix.');}
+}
+/* ==== VALIDAÇÃO EM TEMPO REAL ==== */
+function marcarCampo(id,erro){const el=document.getElementById(id); if(el)el.classList.toggle('campo-erro',!!erro);}
+function checkoutValido(){
+  if(document.getElementById('formCheckout').style.display!=='block') return true;
+  const nome=document.getElementById('cliNome').value.trim();
+  const fone=document.getElementById('cliFone').value.replace(/\D/g,'');
+  const entrega=document.getElementById('cliEntrega').value;
+  const ref=document.getElementById('cliRef').value.trim();
+  const endManual=document.getElementById('cliEndereco').value.trim();
+  const falta=[];
+  if(!nome)falta.push('seu nome');
+  if(fone.length<10)falta.push('seu WhatsApp');
+  marcarCampo('cliNome',!nome); marcarCampo('cliFone',fone.length<10);
+  if(entrega==='Entrega'){
+    if(!bairroSel().nome)falta.push('o bairro');
+    marcarCampo('cliBairro',!bairroSel().nome);
+    if(!geoLink && !ref && !endManual)falta.push('a localização ou um ponto de referência');
+  }
+  const btn=document.getElementById('btnEnviar');
+  if(btn)btn.disabled=falta.length>0;
+  const fi=document.getElementById('faltaInfo');
+  if(fi)fi.textContent=falta.length?'Falta preencher: '+falta.join(', ')+'.':'';
+  return !falta.length;
 }
 
 async function enviarWhatsApp(){
@@ -635,11 +732,7 @@ async function enviarWhatsApp(){
   const pg=document.querySelector('input[name=pg]:checked').value;
   const obs=document.getElementById('cliObs').value.trim();
   const b=bairroSel();
-  if(!nome){alert('Por favor, informe seu nome.');return;}
-  if(entrega==='Entrega' && !b.nome){alert('Selecione o bairro da entrega.');return;}
-  if(entrega==='Entrega' && !geoLink && !endManual && !ref){
-    alert('Envie sua localização ou descreva onde você está.');return;
-  }
+  if(!checkoutValido()){return;}
 
   // v2: o SERVIDOR valida itens, preços, taxa e cupom, e registra o pedido
   const btn=document.querySelector('#formCheckout .btn-zap');
@@ -657,39 +750,114 @@ async function enviarWhatsApp(){
   }
   btn.disabled=false; btn.textContent='📲 Enviar pedido pelo WhatsApp';
 
-  let msg=`*NOVO PEDIDO — Pão Caseiro da Elane* 🍞%0A%0A`;
-  msg+=`*Cliente:* ${nome}%0A`;
-  if(fone)msg+=`*WhatsApp:* ${fone}%0A`;
-  msg+=`*Tipo:* ${entrega}%0A`;
+  const num=String(ped.id).slice(0,8).toUpperCase();
+  const link=location.origin+location.pathname+'?pedido='+ped.id;
+  const SEP='━━━━━━━━━━━━━━';
+  const L=[];
+  L.push('🍞 *PÃO CASEIRO DA ELANE*');
+  L.push('🧾 Pedido *#'+num+'*');
+  L.push(SEP);
+  L.push('👤 *'+nome+'*');
+  if(fone)L.push('📱 '+fone);
   if(entrega==='Entrega'){
-    msg+=`*Bairro:* ${b.nome}%0A`;
-    if(geoLink)msg+=`*Localização:* ${encodeURIComponent(geoLink)}%0A`;
-    if(ref)msg+=`*Referência:* ${ref}%0A`;
-    if(endManual)msg+=`*Endereço:* ${endManual}%0A`;
-  }
-  msg+=`%0A*Itens:*%0A`;
+    L.push('🛵 Entrega — *'+b.nome+'*');
+    if(geoLink)L.push('📍 '+geoLink);
+    if(ref)L.push('📌 Ref.: '+ref);
+    if(endManual)L.push('🏠 '+endManual);
+  } else L.push('🛍️ *Retirada na loja*');
+  L.push(SEP);
+  L.push('*ITENS*');
   carrinho.forEach(i=>{
-    msg+=`• ${i.qtd}x ${i.nome} — R$ ${brl(i.preco*i.qtd)}%0A`;
-    if(i.detalhe)msg+=`  _${i.detalhe}_%0A`;
+    L.push('• '+i.qtd+'x '+i.nome+' — R$ '+brl(i.preco*i.qtd));
+    if(i.detalhe)L.push('    ↳ _'+i.detalhe+'_');
   });
-  msg+=`%0A*Subtotal: R$ ${brl(ped.subtotal)}*%0A`;
-  if(ped.desconto>0)msg+=`*Desconto${cupomAplicado?' ('+cupomAplicado+')':''}: − R$ ${brl(ped.desconto)}*%0A`;
-  if(ped.taxa>0)msg+=`*Taxa de entrega: R$ ${brl(ped.taxa)}*%0A`;
-  msg+=`*Total: R$ ${brl(ped.total)}*%0A`;
-  msg+=`*Pagamento:* ${pg}%0A`;
-  if(pg==='Pix')msg+=`*Chave Pix:* ${PIX}%0A_Envie o comprovante aqui para confirmar o pedido._%0A`;
-  if(obs)msg+=`*Obs:* ${obs}%0A`;
-  msg+=`_Pedido nº ${String(ped.id).slice(0,8)}_%0A`;
-  msg=msg.replace(/\|/g,'-');
+  L.push(SEP);
+  L.push('Subtotal: R$ '+brl(ped.subtotal));
+  if(ped.desconto>0)L.push('Desconto'+(cupomAplicado?' ('+cupomAplicado+')':'')+': − R$ '+brl(ped.desconto));
+  if(ped.taxa>0)L.push('Taxa de entrega: R$ '+brl(ped.taxa));
+  L.push('💰 *TOTAL: R$ '+brl(ped.total)+'*');
+  L.push('💳 Pagamento: *'+pg+'*');
+  if(pg==='Pix'){
+    L.push('🔑 Pix copia e cola (valor já incluso):');
+    L.push('```'+gerarBRCode(ped.total)+'```');
+    L.push('_Envie o comprovante aqui para confirmar o pedido._');
+  }
+  if(obs)L.push('📝 Obs.: '+obs);
+  L.push(SEP);
+  L.push('🔎 Acompanhe seu pedido aqui:');
+  L.push(link);
+  const msg=L.join('\n').replace(/\|/g,'-');
+
   api({acao:'confirmar', id:ped.id}).catch(()=>{});
-  window.open(`https://wa.me/${WHATSAPP}?text=${msg}`,'_blank');
+  try{
+    localStorage.setItem('cli_dados',JSON.stringify({nome,fone,bairro:b.nome||'',ref}));
+    localStorage.setItem('ultimo_pedido',ped.id);
+  }catch(e){}
+  window.open(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`,'_blank');
+  carrinho=[]; atualizarCarrinho();
+  fecharModal('modalCarrinho');
+  abrirAcompanhar(ped.id);
+}
+
+/* ==== ACOMPANHAR PEDIDO ==== */
+let acompTimer=null;
+async function abrirAcompanhar(id){
+  document.getElementById('modalAcomp').classList.add('aberto');
+  await renderAcomp(id);
+  clearInterval(acompTimer);
+  acompTimer=setInterval(()=>{
+    if(document.getElementById('modalAcomp').classList.contains('aberto')) renderAcomp(id);
+    else clearInterval(acompTimer);
+  },30000);
+}
+async function renderAcomp(id){
+  const info=document.getElementById('acompInfo');
+  try{
+    const p=await api({acao:'consultar', id});
+    const d=new Date(p.created_at);
+    info.innerHTML='Pedido <strong>#'+esc(String(p.id).slice(0,8).toUpperCase())+'</strong> — '+
+      d.toLocaleDateString('pt-BR')+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const etapas=[
+      ['recebido','Pedido recebido ✅'],
+      ['preparo','Em preparo 👨‍🍳'],
+      ['entrega', p.tipo==='Entrega'?'Saiu para entrega 🛵':'Pronto para retirada 🛍️'],
+      ['concluido','Concluído 🎉']];
+    const tl=document.getElementById('acompTimeline');
+    if(p.status==='cancelado')
+      tl.innerHTML='<li class="atual"><span class="pt">✕</span><span class="tx">Pedido cancelado — fale com a loja no WhatsApp</span></li>';
+    else if(p.status==='abandonado')
+      tl.innerHTML='<li class="atual"><span class="pt">…</span><span class="tx">Aguardando o envio do pedido no WhatsApp</span></li>';
+    else{
+      const idx=Math.max(0,etapas.findIndex(e=>e[0]===p.status));
+      tl.innerHTML=etapas.map((e,i)=>
+        `<li class="${i<idx?'feito':i===idx?'atual':''}"><span class="pt">${i<idx?'✓':i+1}</span><span class="tx">${e[1]}</span></li>`).join('');
+    }
+    document.getElementById('acompItens').innerHTML=(p.itens||[]).map(i=>
+      `<div class="item-carrinho"><div class="info"><strong>${i.qtd}x ${esc(i.nome)}</strong>
+       ${i.detalhe?`<div class="det">${esc(i.detalhe)}</div>`:''}</div><div>R$ ${brl(i.preco*i.qtd)}</div></div>`).join('');
+    const t=document.getElementById('acompTotal');
+    t.style.display='flex'; t.innerHTML='<span>Total</span><span>R$ '+brl(Number(p.total))+'</span>';
+  }catch(e){
+    info.textContent='Não encontrei esse pedido. Confira o link ou fale com a loja.';
+    document.getElementById('acompTimeline').innerHTML='';
+    document.getElementById('acompItens').innerHTML='';
+    document.getElementById('acompTotal').style.display='none';
+  }
 }
 
 function fecharModal(id){document.getElementById(id).classList.remove('aberto');}
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('aberto');}));
 
+/* validação em tempo real */
+['cliNome','cliFone','cliRef','cliEndereco'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el)el.addEventListener('input',checkoutValido);
+});
+
 /* init */
 carregarCardapio();atualizarCarrinho();carregarConfig();
+const pedidoURL=new URLSearchParams(location.search).get('pedido');
+if(pedidoURL) abrirAcompanhar(pedidoURL);
 </script>
 </body>
 </html>
