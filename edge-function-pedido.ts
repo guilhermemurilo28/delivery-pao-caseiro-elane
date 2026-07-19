@@ -1,5 +1,4 @@
-// Edge Function: pedido — validação de pedidos no SERVIDOR (v2)
-// Ações: preview | criar | confirmar | consultar
+// Edge Function: pedido — validação de pedidos no SERVIDOR (v2.1: grupos de opções)
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const db = createClient(
@@ -13,7 +12,7 @@ const CORS = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 
-type ItemReq = { id: number; qtd: number; tamanho?: string; adicionais?: string[] };
+type ItemReq = { id: number; qtd: number; tamanho?: string; adicionais?: string[]; opcoes?: Record<string, string[]> };
 
 async function calcular(body: any) {
   const itensReq: ItemReq[] = Array.isArray(body.itens) ? body.itens.slice(0, 40) : [];
@@ -24,7 +23,7 @@ async function calcular(body: any) {
 
   const ids = itensReq.map(i => Number(i.id)).filter(Boolean);
   const { data: prods } = await db.from("produtos")
-    .select("id,nome,preco,tamanhos,adicionais,ativo,esgotado,estoque,categoria_id,categorias(hora_ini,hora_fim,ativa)")
+    .select("id,nome,preco,tamanhos,adicionais,opcoes,ativo,esgotado,estoque,categoria_id,categorias(hora_ini,hora_fim,ativa)")
     .in("id", ids);
 
   let subtotal = 0;
@@ -54,11 +53,21 @@ async function calcular(body: any) {
         if (ad) { unit += Number(ad.preco) || 0; detalhe += (detalhe ? " | " : "") + "+" + ad.nome; }
       }
     }
+    // grupos de opções (proteína, molho, acompanhamentos — sem custo extra)
+    if (Array.isArray(p.opcoes)) {
+      const sel = (req.opcoes && typeof req.opcoes === "object") ? req.opcoes : {};
+      for (const g of p.opcoes) {
+        const lista = Array.isArray((sel as any)[g.titulo])
+          ? (sel as any)[g.titulo].filter((x: string) => (g.itens || []).includes(x)).slice(0, g.max || 99) : [];
+        if ((g.min || 0) > lista.length)
+          throw { s: 422, m: `Escolha ${g.min === 1 ? "1 opção" : g.min + " opções"} de ${g.titulo} em "${p.nome}".` };
+        if (lista.length) detalhe += (detalhe ? " | " : "") + g.titulo + ": " + lista.join(", ");
+      }
+    }
     subtotal += unit * qtd;
     itensOk.push({ id: p.id, nome: p.nome, detalhe, preco: unit, qtd });
   }
 
-  // taxa de entrega (do banco, nunca do front)
   let taxa = 0;
   if (body.tipo === "Entrega") {
     const { data: b } = await db.from("bairros").select("taxa").eq("nome", body.bairro).eq("ativo", true).single();
@@ -66,7 +75,6 @@ async function calcular(body: any) {
     taxa = Number(b.taxa);
   }
 
-  // cupom OU cashback (nunca os dois)
   let desconto = 0, cupom: string | null = null, creditoUsado = 0;
   if (body.cupom) {
     const { data: c } = await db.from("cupons").select("*").eq("codigo", String(body.cupom).toUpperCase().trim()).single();
@@ -83,7 +91,7 @@ async function calcular(body: any) {
   }
   desconto = Math.min(desconto, subtotal);
   const total = Math.max(0, subtotal - desconto) + taxa;
-  return { itensOk, subtotal, taxa, desconto, cupom, creditoUsado, total, cashback_pct: Number(cfg.cashback_pct || 0), cashback_dias: cfg.cashback_dias || [] };
+  return { itensOk, subtotal, taxa, desconto, cupom, creditoUsado, total };
 }
 
 Deno.serve(async (req) => {
@@ -98,7 +106,6 @@ Deno.serve(async (req) => {
     }
 
     if (acao === "criar") {
-      // rate limit: 5 pedidos / 10 min por telefone
       if (body.telefone) {
         const dez = new Date(Date.now() - 10 * 60000).toISOString();
         const { count } = await db.from("pedidos").select("id", { count: "exact", head: true })
@@ -124,9 +131,8 @@ Deno.serve(async (req) => {
 
     if (acao === "confirmar") {
       const { data: p } = await db.from("pedidos").select("*").eq("id", body.id).eq("status", "abandonado").single();
-      if (!p) return json({ ok: true }); // já confirmado
+      if (!p) return json({ ok: true });
       await db.from("pedidos").update({ status: "recebido" }).eq("id", p.id);
-      // estoque
       for (const it of (p.itens as any[]) || []) {
         const { data: prod } = await db.from("produtos").select("estoque").eq("id", it.id).single();
         if (prod && prod.estoque !== null) {
@@ -134,19 +140,17 @@ Deno.serve(async (req) => {
           await db.from("produtos").update({ estoque: novo, esgotado: novo === 0 }).eq("id", it.id);
         }
       }
-      // cupom
       if (p.cupom) {
         const { data: c } = await db.from("cupons").select("usados").eq("codigo", p.cupom).single();
         if (c) await db.from("cupons").update({ usados: (c.usados || 0) + 1 }).eq("codigo", p.cupom);
       }
-      // clientes + cashback
       if (p.telefone) {
         const { data: cli } = await db.from("clientes").select("*").eq("telefone", p.telefone).single();
         const cfg = (await db.from("config").select("cashback_pct,cashback_dias").eq("id", 1).single()).data!;
         const dia = new Date().getDay();
         const ganha = (Number(cfg.cashback_pct) > 0 && (cfg.cashback_dias || []).includes(dia))
           ? Number(p.total) * Number(cfg.cashback_pct) / 100 : 0;
-        const usado = !p.cupom ? Number(p.desconto || 0) : 0; // crédito usado quando não foi cupom
+        const usado = !p.cupom ? Number(p.desconto || 0) : 0;
         await db.from("clientes").upsert({
           telefone: p.telefone, nome: p.cliente,
           creditos: Math.max(0, Number(cli?.creditos || 0) - usado + ganha),
@@ -165,7 +169,7 @@ Deno.serve(async (req) => {
       return json(p);
     }
 
-    if (acao === "credito") { // consulta saldo de cashback por telefone
+    if (acao === "credito") {
       const { data: cli } = await db.from("clientes").select("creditos").eq("telefone", body.telefone).single();
       return json({ creditos: Number(cli?.creditos || 0) });
     }

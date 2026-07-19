@@ -1,4 +1,4 @@
-// Edge Function: painel — login com hash + token de sessão + ações administrativas (v2)
+// Edge Function: painel — login com hash + token de sessão + ações administrativas (v2.2: upload de fotos)
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -10,7 +10,7 @@ async function sha256(s: string) {
   const h = await crypto.subtle.digest("SHA-256", enc.encode(s));
   return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
-// PBKDF2-SHA256 (nativo, sem dependências) — formato: pbkdf2$iter$saltHex$hashHex
+// PBKDF2-SHA256 — formato: pbkdf2$iter$saltHex$hashHex
 async function hashSenha(senha: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", enc.encode(senha), "PBKDF2", false, ["deriveBits"]);
@@ -25,7 +25,7 @@ async function verificaSenha(senha: string, stored: string) {
   const key = await crypto.subtle.importKey("raw", enc.encode(senha), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: +iterS, hash: "SHA-256" }, key, 256);
   const calc = [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, "0")).join("");
-  return calc === hashHex; // strings mesmas dimensões
+  return calc === hashHex;
 }
 
 async function exigirToken(body: any) {
@@ -35,6 +35,20 @@ async function exigirToken(body: any) {
   if (!data || new Date(data.expira) < new Date()) throw { s: 401, m: "Sessão expirada. Entre de novo." };
 }
 
+async function subirFoto(b64: string, mime: string) {
+  const m = ["image/jpeg", "image/png", "image/webp"].includes(mime) ? mime : "image/jpeg";
+  if (!b64 || b64.length > 2800000) throw { s: 400, m: "Imagem inválida ou grande demais (máx. ~2 MB)." };
+  let bytes: Uint8Array;
+  try { bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
+  catch { throw { s: 400, m: "Imagem corrompida." }; }
+  const ext = m === "image/png" ? "png" : m === "image/webp" ? "webp" : "jpg";
+  const nome = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await db.storage.from("fotos").upload(nome, bytes, { contentType: m });
+  if (error) throw { s: 500, m: "Falha ao subir a foto." };
+  const { data: pub } = db.storage.from("fotos").getPublicUrl(nome);
+  return pub.publicUrl;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   try {
@@ -42,8 +56,7 @@ Deno.serve(async (req) => {
     const acao = body.acao;
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0] || "0.0.0.0";
 
-    // ---------- AUTENTICAÇÃO ----------
-    if (acao === "bootstrap_senha") { // só funciona enquanto não existe senha
+    if (acao === "bootstrap_senha") {
       const cfg = (await db.from("config").select("senha_hash").eq("id", 1).single()).data!;
       if (cfg.senha_hash) return json({ error: "Senha já definida." }, 409);
       if (String(body.nova || "").length < 8) return json({ error: "Mínimo 8 caracteres." }, 400);
@@ -64,11 +77,11 @@ Deno.serve(async (req) => {
       }
       const token = crypto.randomUUID() + crypto.randomUUID();
       await db.from("sessoes").insert({ token_hash: await sha256(token), expira: new Date(Date.now() + 12 * 3600000).toISOString() });
-      await db.from("sessoes").delete().lt("expira", new Date().toISOString()); // limpeza
+      await db.from("sessoes").delete().lt("expira", new Date().toISOString());
       return json({ token });
     }
 
-    await exigirToken(body); // ---------- daqui pra baixo: só autenticado ----------
+    await exigirToken(body);
 
     if (acao === "trocar_senha") {
       const cfg = (await db.from("config").select("senha_hash").eq("id", 1).single()).data!;
@@ -76,6 +89,11 @@ Deno.serve(async (req) => {
       if (String(body.nova || "").length < 8) return json({ error: "Mínimo 8 caracteres." }, 400);
       await db.from("config").update({ senha_hash: await hashSenha(body.nova) }).eq("id", 1);
       return json({ ok: true });
+    }
+
+    if (acao === "upload_foto") {
+      const url = await subirFoto(String(body.b64 || ""), String(body.mime || ""));
+      return json({ url });
     }
 
     if (acao === "listar") {
@@ -110,7 +128,6 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
-    // ---------- CARDÁPIO (CRUD) ----------
     if (acao === "cardapio") {
       const { data: categorias } = await db.from("categorias").select("*").order("ordem");
       const { data: produtos } = await db.from("produtos").select("*").order("ordem");
@@ -118,13 +135,14 @@ Deno.serve(async (req) => {
     }
     if (acao === "produto_save") {
       const p = body.produto || {};
-      const campos = {
+      const campos: any = {
         categoria_id: p.categoria_id, nome: String(p.nome || "").slice(0, 120), descricao: p.descricao,
         preco: p.preco, tamanhos: p.tamanhos, adicionais: p.adicionais, img: p.img, selos: p.selos,
         destaque: !!p.destaque, ativo: p.ativo !== false, esgotado: !!p.esgotado,
         estoque: p.estoque === "" || p.estoque == null ? null : Number(p.estoque),
         custo: p.custo || null, ordem: Number(p.ordem) || 0,
       };
+      if (p.opcoes !== undefined) campos.opcoes = p.opcoes;
       if (p.id) await db.from("produtos").update(campos).eq("id", p.id);
       else await db.from("produtos").insert(campos);
       return json({ ok: true });
@@ -132,13 +150,17 @@ Deno.serve(async (req) => {
     if (acao === "produto_del") { await db.from("produtos").delete().eq("id", body.id); return json({ ok: true }); }
     if (acao === "categoria_save") {
       const c = body.categoria || {};
-      const campos = { nome: c.nome, emoji: c.emoji, sub: c.sub, ordem: Number(c.ordem) || 0, ativa: c.ativa !== false, hora_ini: c.hora_ini || null, hora_fim: c.hora_fim || null };
+      const campos: any = { nome: c.nome, emoji: c.emoji, sub: c.sub, ordem: Number(c.ordem) || 0, ativa: c.ativa !== false, hora_ini: c.hora_ini || null, hora_fim: c.hora_fim || null };
       if (c.id) await db.from("categorias").update(campos).eq("id", c.id);
       else await db.from("categorias").insert(campos);
       return json({ ok: true });
     }
+    if (acao === "categoria_del") {
+      const { error } = await db.from("categorias").delete().eq("id", body.id);
+      if (error) return json({ error: "Mova ou exclua os produtos desta categoria antes." }, 409);
+      return json({ ok: true });
+    }
 
-    // ---------- CUPONS ----------
     if (acao === "cupons") { const { data } = await db.from("cupons").select("*").order("codigo"); return json({ cupons: data }); }
     if (acao === "cupom_save") {
       const c = body.cupom || {};
@@ -151,7 +173,6 @@ Deno.serve(async (req) => {
     }
     if (acao === "cupom_del") { await db.from("cupons").delete().eq("codigo", body.codigo); return json({ ok: true }); }
 
-    // ---------- CAIXA ----------
     if (acao === "caixa_status") {
       const { data } = await db.from("caixa").select("*").is("fechado_em", null).order("aberto_em", { ascending: false }).limit(1);
       const aberto = data?.[0] || null;
