@@ -105,6 +105,7 @@
     <h1>🍞 Pão Caseiro da Elane <small style="color:#fff;font-weight:400">Painel de Vendas</small></h1>
     <button class="btn" onclick="abrirModal('mVenda')">➕ Novo pedido</button>
     <button class="btn" onclick="abrirCardapio()">🍽️ Cardápio</button>
+    <button class="btn" onclick="abrirIdentidade()">🎨 Identidade</button>
     <button class="btn" onclick="abrirCupons()">🎟️ Cupons</button>
     <button class="btn" onclick="abrirClientes()">📇 Clientes</button>
     <button class="btn" onclick="carregar()">🔄 Atualizar</button>
@@ -183,6 +184,40 @@
   <div class="erro" id="vErro"></div>
 </div></div>
 
+<!-- MODAL identidade -->
+<div class="modal-bg" id="mIdentidade"><div class="modal">
+  <button class="fechar" onclick="fecharModal('mIdentidade')">&times;</button>
+  <h2>🎨 Identidade da loja</h2>
+  <p style="font-size:.82rem;color:#888;margin-bottom:10px">Altere logo, cores, nome e contatos. As mudanças aparecem no site em alguns segundos (o cliente pode precisar atualizar a página).</p>
+  <label>Logo (aparece no topo do site — opcional)</label>
+  <img class="fotoPrev" id="idLogoPrev" alt="" style="display:none;max-height:90px">
+  <input type="file" id="idLogo" accept="image/*" onchange="subirLogo(this)">
+  <div class="msgOk" id="idLogoMsg"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin:4px 0 12px">
+    <button class="btn mini sec" type="button" onclick="removerLogo()">Remover logo</button>
+    <small style="color:#888">Sem logo, mostra o nome com emoji.</small>
+  </div>
+  <label>Emoji</label><input type="text" id="idEmoji" maxlength="4" placeholder="🍞">
+  <label>Nome da loja</label><input type="text" id="idNome" maxlength="80">
+  <label>Frase / tagline</label><input type="text" id="idTagline" maxlength="120">
+  <label>Cidade / localização (texto do topo)</label><input type="text" id="idCidade" maxlength="120">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 12px">
+    <label class="chk" style="flex-direction:column;align-items:flex-start">Fundo 1<input type="color" id="idCor1" style="width:52px;height:34px;padding:0"></label>
+    <label class="chk" style="flex-direction:column;align-items:flex-start">Fundo 2<input type="color" id="idCor2" style="width:52px;height:34px;padding:0"></label>
+    <label class="chk" style="flex-direction:column;align-items:flex-start">Barra menu<input type="color" id="idCor3" style="width:52px;height:34px;padding:0"></label>
+    <label class="chk" style="flex-direction:column;align-items:flex-start">Destaque<input type="color" id="idCor4" style="width:52px;height:34px;padding:0"></label>
+    <label class="chk" style="flex-direction:column;align-items:flex-start">Destaque claro<input type="color" id="idCor5" style="width:52px;height:34px;padding:0"></label>
+  </div>
+  <label>WhatsApp (só números, com DDD e 55)</label><input type="text" id="idWhats" placeholder="5588996073668">
+  <label>Chave Pix</label><input type="text" id="idPix">
+  <label>Localização padrão da entrega (lat,long)</label>
+  <input type="text" id="idGeo" placeholder="-4.528300,-37.692800">
+  <small style="color:#888;display:block;margin-bottom:10px">Usada no mapa quando o cliente não envia o GPS. O padrão já é o centro de Canoa Quebrada.</small>
+  <button class="btn" onclick="salvarIdentidade()">💾 Salvar identidade</button>
+  <div class="erro" id="idErro"></div>
+  <div class="msgOk" id="idOk"></div>
+</div></div>
+
 <!-- MODAL cardápio -->
 <div class="modal-bg" id="mCardapio"><div class="modal" style="max-width:860px">
   <button class="fechar" onclick="fecharModal('mCardapio')">&times;</button>
@@ -214,7 +249,15 @@
     <label class="chk"><input type="checkbox" id="pEsgotado"> esgotado</label>
     <label class="chk"><input type="checkbox" id="pDestaque"> ⭐ destaque</label>
   </div>
-  <button class="btn" onclick="salvarProduto()">Salvar produto</button>
+
+  <div style="border-top:1px dashed #d9c9b3;margin:12px 0 6px;padding-top:10px">
+    <label style="font-weight:700">🧩 Grupos de opções (ingredientes que o cliente escolhe)</label>
+    <p style="font-size:.78rem;color:#888;margin:2px 0 8px">Ex.: <strong>Proteína</strong> (mín. 1 / máx. 1 = obrigatório escolher 1), <strong>Acompanhamentos</strong> (mín. 0 / máx. 4 = escolhe até 4). Sem custo extra.</p>
+    <div id="pOpcoesBox"></div>
+    <button class="btn mini" type="button" onclick="opAddGrupo()" style="margin-top:4px">➕ Adicionar grupo</button>
+  </div>
+
+  <button class="btn" onclick="salvarProduto()" style="margin-top:12px">Salvar produto</button>
   <button class="btn perigo" id="pExcluir" onclick="excluirProduto()">Excluir</button>
   <div class="erro" id="pErro"></div>
 </div></div>
@@ -526,8 +569,46 @@ function editarProduto(id){
   document.getElementById('pFoto').value=''; document.getElementById('pFotoMsg').textContent='';
   document.getElementById('pExcluir').style.display=id?'inline-block':'none';
   document.getElementById('pErro').textContent='';
+  if(!Array.isArray(prodEditando.opcoes)) prodEditando.opcoes=[];
+  renderOpcoes();
   abrirModal('mProduto');
 }
+
+/* ===== editor de grupos de opções (ingredientes) ===== */
+function renderOpcoes(){
+  const box=document.getElementById('pOpcoesBox');
+  const ops=prodEditando.opcoes||[];
+  if(!ops.length){ box.innerHTML='<p style="font-size:.8rem;color:#aaa;margin:0 0 4px">Nenhum grupo ainda. Clique em "Adicionar grupo".</p>'; return; }
+  box.innerHTML=ops.map((g,gi)=>`
+    <div style="border:1px solid #e5d9c8;border-radius:10px;padding:10px;margin-bottom:10px;background:#fffdf9">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <input type="text" placeholder="Nome do grupo (ex.: Proteína)" value="${esc(g.titulo||'')}" oninput="opSet(${gi},'titulo',this.value)" style="flex:1;min-width:150px;margin:0">
+        <button class="btn mini perigo" type="button" onclick="opDelGrupo(${gi})">🗑️</button>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;margin:8px 0;font-size:.8rem;color:#6b5138">
+        <label style="margin:0">Escolher no mín. <input type="number" min="0" max="20" value="${g.min??0}" oninput="opSet(${gi},'min',this.value)" style="width:58px;margin:0;padding:5px"></label>
+        <label style="margin:0">no máx. <input type="number" min="1" max="20" value="${g.max??1}" oninput="opSet(${gi},'max',this.value)" style="width:58px;margin:0;padding:5px"></label>
+        <span style="align-self:center;font-weight:600;color:${(g.min>0)?'#c0392b':'#1a7d3c'}">${(g.min>0)?'obrigatório':'opcional'}</span>
+      </div>
+      ${(g.itens||[]).map((it,ii)=>`
+        <div style="display:flex;gap:6px;margin-bottom:5px">
+          <input type="text" value="${esc(it)}" oninput="opSetItem(${gi},${ii},this.value)" placeholder="Item (ex.: Arroz integral)" style="flex:1;margin:0">
+          <button class="btn mini sec" type="button" onclick="opDelItem(${gi},${ii})">✕</button>
+        </div>`).join('')}
+      <button class="btn mini sec" type="button" onclick="opAddItem(${gi})" style="margin-top:2px">➕ item</button>
+    </div>`).join('');
+}
+function opSet(gi,campo,val){
+  const g=prodEditando.opcoes[gi]; if(!g)return;
+  if(campo==='min'||campo==='max') g[campo]=Math.max(0,Math.min(20,parseInt(val)||0));
+  else g[campo]=val;
+  if(campo==='min') renderOpcoes(); // atualiza rótulo obrigatório/opcional
+}
+function opSetItem(gi,ii,val){ if(prodEditando.opcoes[gi]) prodEditando.opcoes[gi].itens[ii]=val; }
+function opAddGrupo(){ (prodEditando.opcoes=prodEditando.opcoes||[]).push({titulo:'',min:0,max:1,itens:['']}); renderOpcoes(); }
+function opDelGrupo(gi){ prodEditando.opcoes.splice(gi,1); renderOpcoes(); }
+function opAddItem(gi){ (prodEditando.opcoes[gi].itens=prodEditando.opcoes[gi].itens||[]).push(''); renderOpcoes(); }
+function opDelItem(gi,ii){ prodEditando.opcoes[gi].itens.splice(ii,1); renderOpcoes(); }
 async function subirFotoProduto(inp){
   const f=inp.files[0]; if(!f)return;
   const msg=document.getElementById('pFotoMsg'); msg.textContent='Enviando foto...';
@@ -549,6 +630,13 @@ async function salvarProduto(){
   const nome=document.getElementById('pNome').value.trim();
   if(!nome){ el.textContent='Informe o nome.'; return; }
   const preco=document.getElementById('pPreco').value;
+  const opcoes=(prodEditando.opcoes||[]).map(g=>{
+    let min=Math.max(0,Math.min(20,parseInt(g.min)||0));
+    let max=Math.max(1,Math.min(20,parseInt(g.max)||1)); if(max<min) max=min;
+    const itens=[...new Set((g.itens||[]).map(s=>String(s).trim()).filter(Boolean))].slice(0,40);
+    return {titulo:String(g.titulo||'').trim().slice(0,40), min, max, itens};
+  }).filter(g=>g.titulo && g.itens.length);
+  for(const g of opcoes){ if(g.min>g.itens.length){ el.textContent=`No grupo "${g.titulo}", o mínimo (${g.min}) é maior que a quantidade de itens (${g.itens.length}).`; return; } }
   Object.assign(prodEditando,{
     nome, descricao:document.getElementById('pDesc').value.trim()||null,
     categoria_id:+document.getElementById('pCat').value,
@@ -558,6 +646,7 @@ async function salvarProduto(){
     ativo:document.getElementById('pAtivo').checked,
     esgotado:document.getElementById('pEsgotado').checked,
     destaque:document.getElementById('pDestaque').checked,
+    opcoes:opcoes.length?opcoes:null,
   });
   try{ await salvarProdutoObj(prodEditando); fecharModal('mProduto'); abrirCardapio(); }
   catch(e){ el.textContent=e.message; }
@@ -567,6 +656,77 @@ async function excluirProduto(){
   if(!confirm('Excluir este produto do cardápio?'))return;
   try{ await api({acao:'produto_del', id:prodEditando.id}); fecharModal('mProduto'); abrirCardapio(); }
   catch(e){ document.getElementById('pErro').textContent=e.message; }
+}
+
+/* ===== IDENTIDADE ===== */
+let logoAtual='';
+const hexOk=v=>/^#[0-9a-fA-F]{6}$/.test(v||'');
+async function abrirIdentidade(){
+  const er=document.getElementById('idErro'), ok=document.getElementById('idOk');
+  er.textContent=''; ok.textContent='';
+  try{
+    const d=await api({acao:'get_identidade'});
+    const c=d.identidade||{};
+    logoAtual=c.logo||'';
+    const prev=document.getElementById('idLogoPrev');
+    if(logoAtual){ prev.src=logoAtual; prev.style.display='block'; } else prev.style.display='none';
+    document.getElementById('idLogoMsg').textContent='';
+    document.getElementById('idLogo').value='';
+    document.getElementById('idEmoji').value=c.emoji||'';
+    document.getElementById('idNome').value=c.nome||'';
+    document.getElementById('idTagline').value=c.tagline||'';
+    document.getElementById('idCidade').value=c.cidade||'';
+    const def={cor1:'#2c1200',cor2:'#5c2d00',cor3:'#1a0a00',cor4:'#d4961a',cor5:'#f5b731'};
+    ['cor1','cor2','cor3','cor4','cor5'].forEach(k=>{
+      document.getElementById('id'+k.charAt(0).toUpperCase()+k.slice(1)).value=hexOk(c[k])?c[k]:def[k];
+    });
+    document.getElementById('idWhats').value=c.whatsapp||'';
+    document.getElementById('idPix').value=c.pix||'';
+    document.getElementById('idGeo').value=c.geo_padrao||'';
+    abrirModal('mIdentidade');
+  }catch(e){ alert(e.message); }
+}
+async function subirLogo(inp){
+  const f=inp.files[0]; if(!f)return;
+  const msg=document.getElementById('idLogoMsg'); msg.textContent='Enviando logo...';
+  try{
+    const bmp=await createImageBitmap(f);
+    const escala=Math.min(1,600/Math.max(bmp.width,bmp.height));
+    const cv=document.createElement('canvas');
+    cv.width=Math.round(bmp.width*escala); cv.height=Math.round(bmp.height*escala);
+    cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+    const b64=cv.toDataURL('image/png').split(',')[1];
+    const d=await api({acao:'upload_foto', b64, mime:'image/png'});
+    logoAtual=d.url;
+    const prev=document.getElementById('idLogoPrev'); prev.src=d.url; prev.style.display='block';
+    msg.textContent='✅ Logo enviada! Clique em "Salvar identidade".';
+  }catch(e){ msg.textContent=''; document.getElementById('idErro').textContent=e.message; }
+}
+function removerLogo(){
+  logoAtual='';
+  document.getElementById('idLogoPrev').style.display='none';
+  document.getElementById('idLogoMsg').textContent='Logo removida. Clique em "Salvar identidade".';
+}
+async function salvarIdentidade(){
+  const er=document.getElementById('idErro'), ok=document.getElementById('idOk');
+  er.textContent=''; ok.textContent='';
+  const geo=document.getElementById('idGeo').value.trim();
+  if(geo && !/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(geo)){ er.textContent='Localização padrão inválida. Use o formato -4.528300,-37.692800.'; return; }
+  const identidade={
+    emoji:document.getElementById('idEmoji').value.trim(),
+    nome:document.getElementById('idNome').value.trim(),
+    tagline:document.getElementById('idTagline').value.trim(),
+    cidade:document.getElementById('idCidade').value.trim(),
+    cor1:document.getElementById('idCor1').value, cor2:document.getElementById('idCor2').value,
+    cor3:document.getElementById('idCor3').value, cor4:document.getElementById('idCor4').value,
+    cor5:document.getElementById('idCor5').value,
+    whatsapp:document.getElementById('idWhats').value.replace(/\D/g,''),
+    pix:document.getElementById('idPix').value.trim(),
+    geo_padrao:geo.replace(/\s/g,''),
+    logo:logoAtual||null,
+  };
+  try{ await api({acao:'set_identidade', identidade}); ok.textContent='✅ Identidade salva! Atualize o site para ver.'; carregarConfigPublica(); }
+  catch(e){ er.textContent=e.message; }
 }
 
 let catEditando=null;

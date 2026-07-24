@@ -160,9 +160,10 @@
 <body>
 
 <header>
-  <h1>🍞 Pão Caseiro da Elane</h1>
-  <p class="tagline">Sabor de casa, carinho que faz a diferença ❤</p>
-  <p>Canoa Quebrada • Aracati — CE</p>
+  <img id="lojaLogo" alt="" style="display:none;max-height:72px;margin:0 auto 6px;border-radius:12px">
+  <h1 id="lojaNome">🍞 Pão Caseiro da Elane</h1>
+  <p class="tagline" id="lojaTagline">Sabor de casa, carinho que faz a diferença ❤</p>
+  <p id="lojaCidade">Canoa Quebrada • Aracati — CE</p>
   <span class="status" id="statusLoja">● Aberto agora</span>
 </header>
 
@@ -224,22 +225,24 @@
           <option value="0" data-nome="">Selecione o bairro</option>
           <option value="4" data-nome="Canoa Quebrada">Canoa Quebrada — R$ 4,00</option>
         </select>
-        <label>Localização da entrega</label>
-        <button type="button" class="btn-local" onclick="pegarLocalizacao()">📍 Enviar minha localização</button>
+        <label>Localização da entrega (opção 1)</label>
+        <button type="button" class="btn-local" onclick="pegarLocalizacao()">📍 Enviar minha localização (GPS)</button>
         <div id="localStatus" class="local-status"></div>
+        <div id="boxEndManual">
+          <label>Endereço / onde você está (opção 2)</label>
+          <textarea id="cliEndereco" rows="2" placeholder="Rua, número, condomínio, complemento..."></textarea>
+        </div>
         <label>Ponto de referência</label>
         <input type="text" id="cliRef" placeholder="Ex.: em frente à praça, portão azul">
-        <div id="boxEndManual" style="display:none">
-          <label>Descreva onde você está</label>
-          <textarea id="cliEndereco" rows="2" placeholder="Rua, número, ponto de referência..."></textarea>
-        </div>
+        <p class="aviso" style="margin-top:4px">Envie sua localização pelo GPS <strong>ou</strong> escreva o endereço acima. 📍 Somos em Canoa Quebrada.</p>
       </div>
       <label>Forma de pagamento</label>
       <div class="pg-opcoes">
-        <label><input type="radio" name="pg" value="Pix" checked onchange="togglePix()"><span>Pix</span></label>
-        <label><input type="radio" name="pg" value="Cartão na entrega" onchange="togglePix()"><span>Cartão na entrega</span></label>
-        <label><input type="radio" name="pg" value="Dinheiro" onchange="togglePix()"><span>Dinheiro</span></label>
+        <label><input type="radio" name="pg" value="Pix" checked onchange="togglePix();atualizarTotais()"><span>Pix</span></label>
+        <label><input type="radio" name="pg" value="Cartão na entrega" onchange="togglePix();atualizarTotais()"><span>Cartão na entrega</span></label>
+        <label><input type="radio" name="pg" value="Dinheiro" onchange="togglePix();atualizarTotais()"><span>Dinheiro</span></label>
       </div>
+      <p class="aviso" id="avisoCartao" style="display:none;margin:-6px 0 10px;color:#c0392b">💳 Cartão na maquininha tem acréscimo de R$ 2,00 (já somado no total).</p>
       <div id="boxPix" class="box-pix">
         <div class="pix-tit">Pague com Pix</div>
         <div class="pix-qr" id="pixQr"></div>
@@ -281,8 +284,12 @@
 /* ═══════════════════════════════════════════
    CONFIG DO CLIENTE — altere apenas aqui
    ═══════════════════════════════════════════ */
-const WHATSAPP = "5588996073668"; // Pão Caseiro da Elane
-const PIX = "d5f22d0d-b130-4615-91b6-7e887bcf2956"; // Chave Pix aleatória
+let WHATSAPP = "5588996073668"; // Pão Caseiro da Elane (pode ser editado no painel)
+let PIX = "d5f22d0d-b130-4615-91b6-7e887bcf2956"; // Chave Pix aleatória
+let NOME_LOJA = "Pão Caseiro da Elane";
+let EMOJI_LOJA = "🍞";
+let GEO_PADRAO = "-4.528300,-37.692800"; // centro de Canoa Quebrada (padrão da entrega)
+const ACRESCIMO_CARTAO = 2.00; // maquininha de cartão
 
 /* Supabase — v2: pedidos validados no SERVIDOR via Edge Function */
 const SUPABASE_URL = "https://fjlmdqxnxcitzfkumbow.supabase.co";
@@ -297,13 +304,33 @@ async function api(payload){
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
+/* Identidade visual (nome, cores, logo) — editável no painel */
+function aplicarIdentidade(c){
+  if(!c) return;
+  if(c.whatsapp) WHATSAPP = String(c.whatsapp).replace(/\D/g,'');
+  if(c.pix) PIX = c.pix;
+  if(c.emoji) EMOJI_LOJA = c.emoji;
+  if(c.nome) NOME_LOJA = c.nome;
+  if(c.geo_padrao && /^-?\d+\.\d+,-?\d+\.\d+$/.test(c.geo_padrao)) GEO_PADRAO = c.geo_padrao;
+  const rs=document.documentElement.style;
+  const cores={'--roxo':c.cor1,'--roxo2':c.cor2,'--roxo3':c.cor3,'--amarelo':c.cor4,'--amarelo2':c.cor5};
+  for(const k in cores){ if(cores[k]) rs.setProperty(k,cores[k]); }
+  const h1=document.getElementById('lojaNome');
+  if(h1) h1.textContent=((c.emoji?c.emoji+' ':'')+(c.nome||'')).trim()||h1.textContent;
+  const tg=document.getElementById('lojaTagline'); if(tg && c.tagline) tg.textContent=c.tagline;
+  const cd=document.getElementById('lojaCidade'); if(cd && c.cidade) cd.textContent=c.cidade;
+  const lg=document.getElementById('lojaLogo');
+  if(lg && c.logo){ lg.src=c.logo; lg.style.display='block'; if(h1) h1.style.display='none'; }
+  document.title=(c.nome||'Pão Caseiro da Elane')+' — Delivery';
+}
+
 /* Status Aberto/Fechado (controlado no painel) */
 let LOJA_ABERTA = true;
 async function carregarConfig(){
   try{
     const r=await fetch(`${SUPABASE_URL}/rest/v1/config_publica?select=*`,{headers:H_ANON});
     const d=await r.json();
-    if(d && d[0]) LOJA_ABERTA = d[0].loja_aberta;
+    if(d && d[0]){ LOJA_ABERTA = d[0].loja_aberta; aplicarIdentidade(d[0]); }
   }catch(e){ LOJA_ABERTA = true; }
   const b=document.getElementById('statusLoja');
   if(b){
@@ -621,14 +648,15 @@ function taxaAtual(){
 let cupomAplicado=null, descontoPreview=0;
 function atualizarTotais(){
   const el=document.getElementById('resumoTotais'); if(!el) return;
-  const sub=totalCarrinho(), taxa=taxaAtual();
-  const desc=Math.min(descontoPreview,sub), tot=Math.max(0,sub-desc)+taxa;
+  const sub=totalCarrinho(), taxa=taxaAtual(), acr=acrescimoCartao();
+  const desc=Math.min(descontoPreview,sub), tot=Math.max(0,sub-desc)+taxa+acr;
   let h=`<div class="lin"><span>Subtotal</span><span>R$ ${brl(sub)}</span></div>`;
   if(desc>0) h+=`<div class="lin" style="color:#1a7d3c"><span>Desconto (${esc(cupomAplicado||'crédito')})</span><span>− R$ ${brl(desc)}</span></div>`;
   if(taxa>0) h+=`<div class="lin"><span>Taxa de entrega</span><span>R$ ${brl(taxa)}</span></div>`;
+  if(acr>0) h+=`<div class="lin"><span>Acréscimo cartão</span><span>R$ ${brl(acr)}</span></div>`;
   h+=`<div class="lin tot"><span>Total</span><span>R$ ${brl(tot)}</span></div>`;
   el.innerHTML=h;
-  atualizarPix(tot);
+  atualizarPix(Math.max(0,sub-desc)+taxa);
   checkoutValido();
 }
 async function aplicarCupom(){
@@ -665,9 +693,13 @@ function pegarLocalizacao(){
     {enableHighAccuracy:true,timeout:10000}
   );
 }
+function pagamentoSel(){ const el=document.querySelector('input[name=pg]:checked'); return el?el.value:'Pix'; }
+function ehCartao(pg){ return /cart/i.test(pg||pagamentoSel()); }
+function acrescimoCartao(pg){ return ehCartao(pg)?ACRESCIMO_CARTAO:0; }
 function togglePix(){
-  const pg=document.querySelector('input[name=pg]:checked').value;
+  const pg=pagamentoSel();
   document.getElementById('boxPix').style.display = pg==='Pix' ? 'block':'none';
+  const av=document.getElementById('avisoCartao'); if(av) av.style.display = ehCartao(pg)?'block':'none';
 }
 /* ==== PIX BR CODE (copia e cola oficial, com valor) ==== */
 function emv(id,v){v=String(v);return id+String(v.length).padStart(2,'0')+v}
@@ -752,40 +784,51 @@ async function enviarWhatsApp(){
 
   const num=String(ped.id).slice(0,8).toUpperCase();
   const link=location.origin+location.pathname+'?pedido='+ped.id;
-  const SEP='━━━━━━━━━━━━━━';
+  const SEP='━━━━━━━━━━━━━━━━━━';
+  const acr=(ped.acrescimo!=null?Number(ped.acrescimo):acrescimoCartao(pg));
+  const geoFinal=geoLink||('https://maps.google.com/?q='+GEO_PADRAO);
+  const icoGrupo=t=>/prote/i.test(t)?'🥩':/salada/i.test(t)?'🥗':/molho/i.test(t)?'🥣':/acompanh/i.test(t)?'🍚':'🔸';
   const L=[];
-  L.push('🍞 *PÃO CASEIRO DA ELANE*');
-  L.push('🧾 Pedido *#'+num+'*');
+  L.push(EMOJI_LOJA+' *'+NOME_LOJA.toUpperCase()+'*');
+  L.push('✅ *NOVO PEDIDO RECEBIDO*');
+  L.push('🆔 Pedido: *#'+num+'*');
   L.push(SEP);
-  L.push('👤 *'+nome+'*');
-  if(fone)L.push('📱 '+fone);
-  if(entrega==='Entrega'){
-    L.push('🛵 Entrega — *'+b.nome+'*');
-    if(geoLink)L.push('📍 '+geoLink);
-    if(ref)L.push('📌 Ref.: '+ref);
-    if(endManual)L.push('🏠 '+endManual);
-  } else L.push('🛍️ *Retirada na loja*');
+  L.push('👤 *Cliente*');
+  L.push(nome);
+  if(fone)L.push('📞 '+fone);
   L.push(SEP);
-  L.push('*ITENS*');
+  L.push('🍽️ *PEDIDO PARA PREPARO*');
   carrinho.forEach(i=>{
-    L.push('• '+i.qtd+'x '+i.nome+' — R$ '+brl(i.preco*i.qtd));
-    if(i.detalhe)L.push('    ↳ _'+i.detalhe+'_');
+    L.push('🔹 '+i.qtd+'x '+i.nome+' — R$ '+brl(i.preco*i.qtd));
+    if(i.detalhe) String(i.detalhe).split(' | ').forEach(d=>L.push('   '+icoGrupo(d)+' '+d));
   });
-  L.push(SEP);
-  L.push('Subtotal: R$ '+brl(ped.subtotal));
-  if(ped.desconto>0)L.push('Desconto'+(cupomAplicado?' ('+cupomAplicado+')':'')+': − R$ '+brl(ped.desconto));
-  if(ped.taxa>0)L.push('Taxa de entrega: R$ '+brl(ped.taxa));
-  L.push('💰 *TOTAL: R$ '+brl(ped.total)+'*');
-  L.push('💳 Pagamento: *'+pg+'*');
-  if(pg==='Pix'){
-    L.push('🔑 Pix copia e cola (valor já incluso):');
-    L.push('```'+gerarBRCode(ped.total)+'```');
-    L.push('_Envie o comprovante aqui para confirmar o pedido._');
-  }
   if(obs)L.push('📝 Obs.: '+obs);
   L.push(SEP);
-  L.push('🔎 Acompanhe seu pedido aqui:');
+  L.push('💰 *Resumo do Pedido*');
+  L.push('Subtotal: R$ '+brl(ped.subtotal));
+  if(ped.desconto>0)L.push('Desconto'+(cupomAplicado?' ('+cupomAplicado+')':'')+': − R$ '+brl(ped.desconto));
+  if(ped.taxa>0)L.push('🚚 Taxa de entrega: R$ '+brl(ped.taxa));
+  if(acr>0)L.push('💳 Acréscimo cartão: R$ '+brl(acr));
+  L.push('💵 *TOTAL: R$ '+brl(ped.total)+'*');
+  L.push('💳 Forma de pagamento: '+(pg==='Pix'?'PIX':pg));
+  L.push(SEP);
+  if(entrega==='Entrega'){
+    L.push('🚚 *ENTREGA*');
+    L.push('📍 '+b.nome);
+    L.push('🗺️ Localização:');
+    L.push(geoFinal);
+    if(endManual)L.push('🏠 '+endManual);
+    if(ref)L.push('📌 Ref.: '+ref);
+  } else {
+    L.push('🛍️ *RETIRADA NA LOJA*');
+  }
+  L.push(SEP);
+  L.push('📲 Acompanhe seu pedido:');
   L.push(link);
+  L.push('🙏 *Obrigado pela preferência!*');
+  L.push(pg==='Pix'
+    ? 'Seu pedido já foi recebido e está sendo preparado. Assim que o pagamento for confirmado, iniciaremos a produção.'
+    : 'Seu pedido já foi recebido e está sendo preparado. 🙌');
   const msg=L.join('\n').replace(/\|/g,'-');
 
   api({acao:'confirmar', id:ped.id}).catch(()=>{});
